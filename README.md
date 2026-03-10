@@ -1,6 +1,23 @@
 # farmadoc-infrastructure
 
+Инфраструктура Farmadoc (Docker).
 
+## Milvus
+
+Векторная БД Milvus (последняя стабильная v2.6.11) поднимается через Docker Compose.
+
+**Запуск:**
+```bash
+docker-compose up -d
+```
+
+**Доступ для n8n:**
+- Из контейнера в той же сети: хост `milvus`, порт `19530`
+- С хоста: `localhost:19530`
+
+Подробнее: [docs/milvus-n8n.md](docs/milvus-n8n.md)
+
+---
 
 ## Getting started
 
