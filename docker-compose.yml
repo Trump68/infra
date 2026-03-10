@@ -1,5 +1,5 @@
-# Milvus standalone stack (latest stable v2.6.x)
-# Доступ для n8n: host=milvus, port=19530 (в одной сети) или localhost:19530
+# Milvus + vLLM (эмбеддинги и др. модели с Hugging Face)
+# n8n: milvus — host=milvus:19530, vLLM — host=vllm:8000
 
 services:
   etcd:
@@ -62,10 +62,35 @@ services:
     networks:
       - milvus
 
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm
+    # Модель из .env (VLLM_MODEL), по умолчанию — эмбеддинг BGE small. Для gated-моделей: HF_TOKEN
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+    command: ["--model", "${VLLM_MODEL:-BAAI/bge-small-en-v1.5}"]
+    volumes:
+      - vllm_cache:/root/.cache/huggingface
+    ports:
+      - "8000:8000"
+    # Нужно для инференса (GPU или большой CPU)
+    shm_size: "2gb"
+    # Раскомментировать для GPU:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    networks:
+      - milvus
+
 volumes:
   etcd_data:
   minio_data:
   milvus_data:
+  vllm_cache:
 
 networks:
   milvus:

@@ -17,6 +17,15 @@ docker-compose up -d
 
 Подробнее: [docs/milvus-n8n.md](docs/milvus-n8n.md)
 
+## vLLM
+
+Сервис для запуска моделей с Hugging Face (эмбеддинги, при необходимости LLM). API совместим с OpenAI.
+
+- Модель задаётся в `.env`: `VLLM_MODEL=org/name-model` (по умолчанию `BAAI/bge-small-en-v1.5`)
+- Доступ: с хоста `http://localhost:8000`, из n8n в той же сети — `http://vllm:8000`
+
+Подробнее: [docs/vllm.md](docs/vllm.md)
+
 ---
 
 ## Getting started
