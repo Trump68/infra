@@ -61,28 +61,21 @@ services:
       start_period: 90s
     networks:
       - milvus
-
-  vllm:
-    image: vllm/vllm-openai:latest
-    container_name: vllm
-    # Модель из .env (VLLM_MODEL), по умолчанию — эмбеддинг BGE small. Для gated-моделей: HF_TOKEN
-    environment:
-      - HF_TOKEN=${HF_TOKEN:-}
-    command: ["--model", "${VLLM_MODEL:-BAAI/bge-small-en-v1.5}"]
-    volumes:
-      - vllm_cache:/root/.cache/huggingface
+  vllm_emb:
+    image: vllm/vllm-openai:v0.17.0
+    container_name: vllm_emb
     ports:
       - "8000:8000"
-    # Нужно для инференса (GPU или большой CPU)
-    shm_size: "2gb"
-    # Раскомментировать для GPU:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+    volumes:
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
+    command: Qwen/Qwen3-Embedding-0.6B --gpu-memory-utilization 0.6
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     networks:
       - milvus
 
