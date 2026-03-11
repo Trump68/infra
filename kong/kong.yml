@@ -1,0 +1,21 @@
+# Kong declarative config (DB-less)
+# Backend: по умолчанию — placeholder-сервис backend (nginx) в compose. Для реального API замените url на свой BACKEND_URL.
+# OIDC issuer: замените на URL discovery вашего Authentik Provider (см. docs/authentik.md).
+
+_format_version: "3.0"
+
+services:
+  - name: backend
+    url: http://backend:80
+    routes:
+      - name: api
+        paths:
+          - /api
+        strip_path: false
+    plugins:
+      - name: openid-connect
+        config:
+          issuer: http://authentik-server:9000/application/o/default/.well-known/openid-configuration/
+          auth_methods:
+            - bearer
+          consumer_optional: false

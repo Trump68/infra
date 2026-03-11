@@ -1,5 +1,6 @@
-# Milvus + vLLM (эмбеддинги и др. модели с Hugging Face)
-# n8n: milvus — host=milvus:19530, vLLM — host=vllm:8000
+# Milvus + vLLM (эмбеддинги) + Kong + Authentik + backend upstream
+# n8n: milvus — host=milvus:19530, vLLM — host=vllm_emb:8000
+# API: Kong :8000/:8443 → OIDC (Authentik) → BACKEND_URL
 
 services:
   etcd:
@@ -88,6 +89,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init-authentik-db.sh:/docker-entrypoint-initdb.d/02-init-authentik-db.sh:ro
     ports:
       - "5432:5432"
     healthcheck:
@@ -98,12 +100,95 @@ services:
     networks:
       - farmadoc-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    networks:
+      - farmadoc-network
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.8.3
+    container_name: authentik-server
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__USER: ${POSTGRES_USER:-postgres}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${POSTGRES_PASSWORD}
+      AUTHENTIK_REDIS__HOST: redis
+    command: server
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - farmadoc-network
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.8.3
+    container_name: authentik-worker
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__USER: ${POSTGRES_USER:-postgres}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${POSTGRES_PASSWORD}
+      AUTHENTIK_REDIS__HOST: redis
+    command: worker
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - farmadoc-network
+
+  backend:
+    image: nginx:alpine
+    container_name: backend
+    # Placeholder для проверки цепочки Kong → backend; замените на свой сервис или укажите внешний URL в kong/kong.yml
+    networks:
+      - farmadoc-network
+
+  kong:
+    image: kong:3.7
+    container_name: kong
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+    volumes:
+      - ./kong/kong.yml:/kong/kong.yml:ro
+    ports:
+      - "8001:8000"   # proxy HTTP (внешний 8001, т.к. 8000 занят vLLM)
+      - "8444:8443"   # proxy HTTPS
+    depends_on:
+      - authentik-server
+      - backend
+    networks:
+      - farmadoc-network
+
 volumes:
   etcd_data:
   minio_data:
   milvus_data:
   vllm_cache:
   postgres_data:
+  authentik_media:
+  authentik_templates:
 
 networks:
   farmadoc-network:
