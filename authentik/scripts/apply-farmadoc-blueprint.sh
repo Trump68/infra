@@ -209,6 +209,8 @@ if [[ -z "${SKIP_DOCKER_SETUP:-}" || "$SKIP_DOCKER_SETUP" == "0" ]]; then
 
   echo "[3/5] Запуск Redis и Authentik (server, worker)..."
   (cd "$REPO_ROOT" && start_authentik_services) || exit 1
+  # Триггер применения file-based blueprint (файл смонтирован в /blueprints в контейнере)
+  touch "$BLUEPRINT_FILE" 2>/dev/null || true
 else
   echo "Пропуск шагов 2–3 (SKIP_DOCKER_SETUP=1)."
 fi
@@ -246,7 +248,9 @@ if import_via_managed_file; then
 fi
 
 echo ""
-echo "Не удалось применить blueprint ни одним из способов." >&2
-echo "Проверьте Swagger: ${AUTHENTIK_URL}/api/v3/schema/swagger/" >&2
-echo "Альтернатива: Customization → Blueprints → Apply blueprint (загрузить файл вручную)." >&2
-exit 1
+echo "Не удалось применить blueprint через API."
+echo "Blueprint смонтирован в контейнер (docker-compose: /blueprints/farmadoc/farmadoc-oidc.yaml) и будет применён автоматически:"
+echo "  — по расписанию (до ~60 мин) или при изменении файла;"
+echo "  — для ускорения: touch $BLUEPRINT_FILE  или  docker compose restart authentik-worker"
+echo "Проверка: Customization → Blueprints в панели Authentik; при необходимости — Apply blueprint вручную."
+exit 0
