@@ -8,12 +8,12 @@
   AUTHENTIK_URL     — базовый URL Authentik (по умолчанию http://192.168.173.157:9000)
   CLIENT_ID         — Client ID провайдера
   REDIRECT_URI      — redirect_uri провайдера (по умолчанию http://localhost:3000/callback)
-  KONG_URL          — если задан, после получения токена проверяет запрос к Kong (http://IP:8001)
+  KONG_URL          — после получения токена проверяет доступ через Kong к бэкенду (по умолчанию http://localhost:8001). Пусто — пропустить проверку.
 
 Использование:
   python3 get-oauth2-access-token.py
   AUTHENTIK_URL=http://localhost:9000 CLIENT_ID=xxx python3 get-oauth2-access-token.py
-  KONG_URL=http://192.168.173.157:8001 python3 get-oauth2-access-token.py
+  KONG_URL= python3 get-oauth2-access-token.py   # не проверять Kong
 """
 import json
 import os
@@ -25,7 +25,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 AUTHENTIK_URL = os.environ.get("AUTHENTIK_URL", "http://192.168.173.157:9000").rstrip("/")
 CLIENT_ID = os.environ.get("CLIENT_ID", "LxTTZjn6WYpDkdolfVmBpsvskvScMxyfQUFWnmFm")
 REDIRECT_URI = os.environ.get("REDIRECT_URI", "http://localhost:3000/callback")
-KONG_URL = os.environ.get("KONG_URL", "")
+KONG_URL = os.environ.get("KONG_URL", "http://localhost:8001").strip() or ""
 received_code = None
 
 AUTHORIZE_URL = f"{AUTHENTIK_URL}/application/o/authorize/"
@@ -96,16 +96,34 @@ def main():
     print(access_token)
 
     if KONG_URL:
-        url = f"{KONG_URL.rstrip('/')}/api/" if not KONG_URL.endswith("/api") else KONG_URL
+        base = KONG_URL.rstrip("/")
+        probe_path = "/api/" if "/api" not in base else ""
+        url = f"{base}{probe_path}" if probe_path else base
         if not url.endswith("/"):
             url += "/"
-        print(f"\n4. Testing Kong {url}...")
+        print(f"\n4. Проверка доступа через Kong к бэкенду: {url}")
         req = urllib.request.Request(url, headers={"Authorization": f"Bearer {access_token}"})
         try:
-            with urllib.request.urlopen(req, timeout=5) as r:
-                print(f"   Kong: {r.status}")
+            with urllib.request.urlopen(req, timeout=10) as r:
+                body = r.read()
+                status = r.status
+                print(f"   Доступ к бэкенду: OK ({status})")
+                if body:
+                    snippet = body[:200].decode("utf-8", errors="replace")
+                    if len(body) > 200:
+                        snippet += "..."
+                    print(f"   Ответ (начало): {snippet}")
         except urllib.error.HTTPError as e:
-            print(f"   Kong: {e.code}")
+            body = e.read()
+            if e.code == 404:
+                print(f"   Доступ к бэкенду: запрос прошёл через Kong (бэкенд вернул 404 для пути — нормально для placeholder nginx)")
+            elif e.code == 401:
+                print(f"   Доступ к бэкенду: ошибка 401 — токен не принят (проверьте issuer и настройки JWT в Kong)")
+            else:
+                print(f"   Доступ к бэкенду: ответ бэкенда {e.code} ({e.reason})")
+        except OSError as e:
+            print(f"   Доступ к бэкенду: ошибка соединения — {e}")
+            print("   (Kong не запущен или KONG_URL недоступен)")
 
 
 if __name__ == "__main__":
