@@ -11,9 +11,9 @@
   KONG_URL          — после получения токена проверяет доступ через Kong к бэкенду (по умолчанию http://localhost:8001). Пусто — пропустить проверку.
 
 Использование:
-  python3 get-oauth2-access-token.py
-  AUTHENTIK_URL=http://localhost:9000 CLIENT_ID=xxx python3 get-oauth2-access-token.py
-  KONG_URL= python3 get-oauth2-access-token.py   # не проверять Kong
+  python3 check-authentik-token.py
+  AUTHENTIK_URL=http://localhost:9000 CLIENT_ID=xxx python3 check-authentik-token.py
+  KONG_URL= python3 check-authentik-token.py   # не проверять Kong
 """
 import json
 import os
