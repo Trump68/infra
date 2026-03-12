@@ -6,6 +6,7 @@ services:
   etcd:
     image: quay.io/coreos/etcd:v3.5.11
     container_name: milvus-etcd
+    restart: unless-stopped
     environment:
       - ETCD_AUTO_COMPACTION_MODE=revision
       - ETCD_AUTO_COMPACTION_RETENTION=1000
@@ -25,6 +26,7 @@ services:
   minio:
     image: minio/minio:RELEASE.2024-01-16T16-07-38Z
     container_name: milvus-minio
+    restart: unless-stopped
     environment:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
@@ -38,6 +40,7 @@ services:
   milvus:
     image: milvusdb/milvus:v2.6.11
     container_name: milvus-standalone
+    restart: unless-stopped
     command: ["milvus", "run", "standalone"]
     environment:
       ETCD_ENDPOINTS: etcd:2379
@@ -65,6 +68,7 @@ services:
   vllm_emb:
     image: vllm/vllm-openai:v0.17.0
     container_name: vllm_emb
+    restart: unless-stopped
     ports:
       - "8000:8000"
     volumes:
@@ -83,6 +87,7 @@ services:
   postgres:
     image: postgres:17
     container_name: postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -103,12 +108,14 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis
+    restart: unless-stopped
     networks:
       - farmadoc-network
 
   authentik-server:
     image: ghcr.io/goauthentik/server:2024.8.3
     container_name: authentik-server
+    restart: unless-stopped
     environment:
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
       AUTHENTIK_POSTGRESQL__HOST: postgres
@@ -139,6 +146,7 @@ services:
   authentik-worker:
     image: ghcr.io/goauthentik/server:2024.8.3
     container_name: authentik-worker
+    restart: unless-stopped
     environment:
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
       AUTHENTIK_POSTGRESQL__HOST: postgres
@@ -165,6 +173,7 @@ services:
   backend:
     image: nginx:alpine
     container_name: backend
+    restart: unless-stopped
     # Placeholder для проверки цепочки Kong → backend; замените на свой сервис или укажите внешний URL в kong/kong.yml
     networks:
       - farmadoc-network
@@ -172,6 +181,7 @@ services:
   kong:
     image: kong:3.7
     container_name: kong
+    restart: unless-stopped
     environment:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /kong/kong.yml
