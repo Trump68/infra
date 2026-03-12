@@ -9,6 +9,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "$REPO_ROOT"
 
+# Проверка доступа к Docker (без прав будет permission denied на одном из шагов)
+if ! docker info &>/dev/null; then
+  echo "Ошибка: нет доступа к Docker (permission denied)." >&2
+  echo "Запустите скрипт с sudo: sudo $0 $*" >&2
+  echo "Либо добавьте пользователя в группу docker: sudo usermod -aG docker \$USER и перелогиньтесь." >&2
+  exit 1
+fi
+
 FORCE=
 for arg in "$@"; do
   case "$arg" in

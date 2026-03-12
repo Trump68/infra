@@ -131,7 +131,7 @@ services:
       - authentik_media:/media
       - authentik_templates:/templates
       # File-based blueprint: Authentik обнаруживает и применяет YAML из /blueprints (периодически и при изменении файла)
-      - ./authentik/blueprints/farmadoc-oidc.yaml:/blueprints/farmadoc/farmadoc-oidc.yaml:ro
+      # - ./authentik/blueprints/farmadoc-oidc.yaml:/blueprints/farmadoc/farmadoc-oidc.yaml:ro
     ports:
       - "9000:9000"
       - "9443:9443"
@@ -161,7 +161,7 @@ services:
     volumes:
       - authentik_media:/media
       - authentik_templates:/templates
-      - ./authentik/blueprints/farmadoc-oidc.yaml:/blueprints/farmadoc/farmadoc-oidc.yaml:ro
+      # - ./authentik/blueprints/farmadoc-oidc.yaml:/blueprints/farmadoc/farmadoc-oidc.yaml:ro
     depends_on:
       postgres:
         condition: service_healthy

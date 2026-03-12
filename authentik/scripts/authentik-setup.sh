@@ -1,19 +1,30 @@
 #!/usr/bin/env bash
-# Полный цикл установки Authentik (шаги 2–4): проверка/создание БД authentik, запуск сервисов,
-# ожидание готовности API и применение blueprint authentik/blueprints/farmadoc-oidc.yaml.
-# Запуск из корня репозитория. Требует: .env с POSTGRES_* и AUTHENTIK_* (или AUTHENTIK_BOOTSTRAP_TOKEN).
+# Установка Authentik: по умолчанию только инфраструктура (PostgreSQL, БД authentik, Redis, server, worker).
+# С опцией -e|--export — дополнительно загрузка чертежа в Authentik и экспорт в authentik/blueprints/.
+# Запуск из корня репозитория. Требует: .env с POSTGRES_*; для --export также AUTHENTIK_TOKEN (или AUTHENTIK_BOOTSTRAP_TOKEN).
 # Использование:
-#   ./authentik/scripts/apply-farmadoc-blueprint.sh
-#   AUTHENTIK_URL=http://localhost:9000 AUTHENTIK_TOKEN=... ./authentik/scripts/apply-farmadoc-blueprint.sh
-#   ./authentik/scripts/apply-farmadoc-blueprint.sh http://localhost:9000 your-token
-# Пропуск шагов 2–3 (только применение blueprint к уже запущенному Authentik):
-#   SKIP_DOCKER_SETUP=1 ./authentik/scripts/apply-farmadoc-blueprint.sh
+#   ./authentik/scripts/authentik-setup.sh
+#   ./authentik/scripts/authentik-setup.sh --export
+#   ./authentik/scripts/authentik-setup.sh -e http://localhost:9000 your-token
+# Пропуск шагов инфраструктуры (только загрузка чертежа к уже запущенному Authentik):
+#   SKIP_DOCKER_SETUP=1 ./authentik/scripts/authentik-setup.sh --export
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 BLUEPRINT_FILE="${REPO_ROOT}/authentik/blueprints/farmadoc-oidc.yaml"
+EXPORT_BLUEPRINT_NAME="${EXPORT_BLUEPRINT_NAME:-Farmadoc OIDC Provider and Application}"
+
+# Разбор аргументов: -e|--export и позиционные [AUTHENTIK_URL] [AUTHENTIK_TOKEN]
+DO_EXPORT=0
+POS_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -e|--export) DO_EXPORT=1; shift ;;
+    *)           POS_ARGS+=("$1"); shift ;;
+  esac
+done
 
 if [[ ! -f "$BLUEPRINT_FILE" ]]; then
   echo "Ошибка: файл blueprint не найден: $BLUEPRINT_FILE" >&2
@@ -33,9 +44,9 @@ fi
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_DB="${POSTGRES_DB:-postgres}"
 
-# URL и аргументы: первый аргумент — URL, второй — токен (приоритет: аргумент > env > .env)
-AUTHENTIK_URL="${1:-${AUTHENTIK_URL:-http://localhost:9000}}"
-AUTHENTIK_TOKEN="${2:-${AUTHENTIK_TOKEN_ENV:-${AUTHENTIK_TOKEN}}}"
+# URL и токен: приоритет позиционные аргументы > env > .env
+AUTHENTIK_URL="${POS_ARGS[0]:-${AUTHENTIK_URL:-http://localhost:9000}}"
+AUTHENTIK_TOKEN="${POS_ARGS[1]:-${AUTHENTIK_TOKEN_ENV:-${AUTHENTIK_TOKEN}}}"
 if [[ -z "$AUTHENTIK_TOKEN" && -n "${AUTHENTIK_BOOTSTRAP_TOKEN:-}" ]]; then
   AUTHENTIK_TOKEN="$AUTHENTIK_BOOTSTRAP_TOKEN"
 fi
@@ -194,30 +205,59 @@ import_via_managed_file() {
   return 1
 }
 
+# --- Экспорт чертежа (опция -e|--export) ---
+run_export_blueprint() {
+  echo ""
+  echo "Экспорт чертежа: ${EXPORT_BLUEPRINT_NAME}"
+  AUTHENTIK_URL="$AUTHENTIK_URL" AUTHENTIK_TOKEN="$AUTHENTIK_TOKEN" \
+    "${SCRIPT_DIR}/export-blueprint-from-container.sh" "$EXPORT_BLUEPRINT_NAME" || true
+}
+
 # --- Основной поток ---
 
 echo "Authentik: ${AUTHENTIK_URL}"
 echo "Blueprint:  ${BLUEPRINT_FILE}"
+if [[ "$DO_EXPORT" -eq 1 ]]; then
+  echo "Режим:      загрузка чертежа в Authentik и экспорт"
+else
+  echo "Режим:      только инфраструктура (без загрузки чертежа; для загрузки укажите -e|--export)"
+fi
 echo ""
 
 if [[ -z "${SKIP_DOCKER_SETUP:-}" || "$SKIP_DOCKER_SETUP" == "0" ]]; then
-  echo "[1/5] Запуск PostgreSQL..."
+  echo "[1/4] Запуск PostgreSQL..."
   (cd "$REPO_ROOT" && ensure_postgres_running) || exit 1
 
-  echo "[2/5] Проверка/создание БД authentik..."
+  echo "[2/4] Проверка/создание БД authentik..."
   (cd "$REPO_ROOT" && ensure_authentik_db) || exit 1
 
-  echo "[3/5] Запуск Redis и Authentik (server, worker)..."
+  echo "[3/4] Запуск Redis и Authentik (server, worker)..."
   (cd "$REPO_ROOT" && start_authentik_services) || exit 1
-  # Триггер применения file-based blueprint (файл смонтирован в /blueprints в контейнере)
-  touch "$BLUEPRINT_FILE" 2>/dev/null || true
+  if [[ "$DO_EXPORT" -eq 1 ]]; then
+    touch "$BLUEPRINT_FILE" 2>/dev/null || true
+  fi
+
+  echo "[4/4] Ожидание готовности Authentik..."
+  wait_for_authentik_api || exit 1
 else
-  echo "Пропуск шагов 2–3 (SKIP_DOCKER_SETUP=1)."
+  echo "Пропуск шагов 1–4 (SKIP_DOCKER_SETUP=1)."
+  if [[ "$DO_EXPORT" -eq 1 ]]; then
+    echo "[4/5] Ожидание готовности Authentik API..."
+    wait_for_authentik_api || exit 1
+  fi
 fi
 
+if [[ "$DO_EXPORT" -eq 0 ]]; then
+  echo ""
+  echo "Готово. Authentik запущен (${AUTHENTIK_URL}). Чтобы загрузить чертёж и экспортировать его, выполните:"
+  echo "  $0 --export [AUTHENTIK_URL] [AUTHENTIK_TOKEN]"
+  exit 0
+fi
+
+# Далее только при -e|--export: загрузка чертежа и экспорт
 if [[ -z "$AUTHENTIK_TOKEN" ]]; then
-  echo "Ошибка: нужен AUTHENTIK_TOKEN или AUTHENTIK_BOOTSTRAP_TOKEN (в .env или аргументом)." >&2
-  echo "Использование: $0 [AUTHENTIK_URL] [AUTHENTIK_TOKEN]" >&2
+  echo "Ошибка: для загрузки чертежа нужен AUTHENTIK_TOKEN или AUTHENTIK_BOOTSTRAP_TOKEN (в .env или аргументом)." >&2
+  echo "Использование: $0 -e|--export [AUTHENTIK_URL] [AUTHENTIK_TOKEN]" >&2
   exit 1
 fi
 if [[ -n "${AUTHENTIK_BOOTSTRAP_TOKEN:-}" && "$AUTHENTIK_TOKEN" == "$AUTHENTIK_BOOTSTRAP_TOKEN" ]]; then
@@ -229,26 +269,28 @@ fi
 echo "[4/5] Ожидание готовности Authentik API..."
 wait_for_authentik_api || exit 1
 
-echo "[5/5] Применение blueprint..."
-# Сначала managed (JSON) — основной способ; при 405 в части версий Authentik см. подсказку ниже
+echo "[5/5] Загрузка чертежа в Authentik..."
 if import_via_managed; then
+  run_export_blueprint
   echo ""
   echo "Готово. Провайдер и приложение: Directory → Providers, Directory → Applications (Farmadoc OIDC, farmadoc_client)."
   exit 0
 fi
 if import_via_flow_import; then
+  run_export_blueprint
   echo ""
   echo "Готово. Провайдер и приложение: Directory → Providers, Directory → Applications (Farmadoc OIDC, farmadoc_client)."
   exit 0
 fi
 if import_via_managed_file; then
+  run_export_blueprint
   echo ""
   echo "Готово. Провайдер и приложение: Directory → Providers, Directory → Applications (Farmadoc OIDC, farmadoc_client)."
   exit 0
 fi
 
 echo ""
-echo "Не удалось применить blueprint через API."
+echo "Не удалось загрузить чертёж через API."
 echo "Blueprint смонтирован в контейнер (docker-compose: /blueprints/farmadoc/farmadoc-oidc.yaml) и будет применён автоматически:"
 echo "  — по расписанию (до ~60 мин) или при изменении файла;"
 echo "  — для ускорения: touch $BLUEPRINT_FILE  или  docker compose restart authentik-worker"

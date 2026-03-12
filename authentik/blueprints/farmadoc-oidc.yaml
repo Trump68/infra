@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json
 # Blueprint: провайдер OAuth2/OIDC и приложение Farmadoc для Kong + SPA.
 # Применение: через API (см. authentik/doc/authentik.md) или загрузку в UI (Customization → Blueprints).
 # Требует уже созданные потоки: default-authentication-flow, default-provider-authorization-explicit-consent
@@ -8,6 +9,14 @@ metadata:
   name: Farmadoc OIDC Provider and Application
 
 entries:
+  # Группа для приложений Farmadoc (нужна для поля group у application)
+  - id: farmadoc_group
+    model: authentik_core.group
+    identifiers:
+      name: farmadoc
+    attrs:
+      name: farmadoc
+
   # Провайдер OAuth2/OIDC (slug будет сгенерирован из name, например farmadoc-oidc)
   - id: farmadoc_provider
     model: authentik_providers_oauth2.oauth2provider
@@ -41,5 +50,31 @@ entries:
       name: farmadoc_client
       slug: farmadoc_client
       provider: !KeyOf farmadoc_provider
-      group: farmadoc
+      group: !KeyOf farmadoc_group
       policy_engine_mode: any
+
+  # Отключение email-транспорта уведомлений (только локальный — без SMTP, устраняет Connection refused в логах)
+  - model: authentik_events.notificationrule
+    identifiers:
+      name: default-notify-configuration-error
+    attrs:
+      transports:
+        - !Find [authentik_events.notificationtransport, [name, default-local-transport]]
+  - model: authentik_events.notificationrule
+    identifiers:
+      name: default-notify-configuration-warning
+    attrs:
+      transports:
+        - !Find [authentik_events.notificationtransport, [name, default-local-transport]]
+  - model: authentik_events.notificationrule
+    identifiers:
+      name: default-notify-update
+    attrs:
+      transports:
+        - !Find [authentik_events.notificationtransport, [name, default-local-transport]]
+  - model: authentik_events.notificationrule
+    identifiers:
+      name: default-notify-exception
+    attrs:
+      transports:
+        - !Find [authentik_events.notificationtransport, [name, default-local-transport]]

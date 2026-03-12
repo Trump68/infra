@@ -9,7 +9,7 @@ Authentik — сервер авторизации (IdP) для единого в
 ## Предварительные требования
 
 - **Docker** и **Docker Compose** (v2)
-- Репозиторий с файлами: `docker-compose.yml`, `postgres/init-authentik-db.sh`, `authentik/blueprints/farmadoc-oidc.yaml`, `authentik/scripts/apply-farmadoc-blueprint.sh`
+- Репозиторий с файлами: `docker-compose.yml`, `postgres/init-authentik-db.sh`, `authentik/blueprints/farmadoc-oidc.yaml`, `authentik/scripts/authentik-setup.sh`
 - Для скрипта применения blueprint: `curl`, а также `jq` или `python3`
 
 ---
@@ -65,22 +65,23 @@ docker compose up -d postgres redis authentik-server authentik-worker
 
 ### 4. Применение blueprint (рекомендуемый способ — один скрипт на шаги 2–4)
 
-Скрипт **`authentik/scripts/apply-farmadoc-blueprint.sh`** выполняет шаги 2–4 целиком: запускает PostgreSQL при необходимости, создаёт БД `authentik` при отсутствии, поднимает Redis и Authentik (server, worker), ждёт готовности API и применяет blueprint. Запуск из **корня репозитория** (нужен подготовленный `.env`, шаг 1):
+Скрипт **`authentik/scripts/authentik-setup.sh`** по умолчанию поднимает только инфраструктуру (PostgreSQL, БД `authentik`, Redis, authentik-server, authentik-worker). С опцией **`-e`** или **`--export`** дополнительно загружает чертёж в Authentik и экспортирует его в `authentik/blueprints/`. Запуск из **корня репозитория** (нужен подготовленный `.env`, шаг 1):
 
 ```bash
-./authentik/scripts/apply-farmadoc-blueprint.sh
+./authentik/scripts/authentik-setup.sh
+./authentik/scripts/authentik-setup.sh --export
 ```
 
 Скрипт подхватывает `.env` из корня репозитория; по умолчанию `AUTHENTIK_URL=http://localhost:9000`. Токен берётся из `AUTHENTIK_TOKEN` или `AUTHENTIK_BOOTSTRAP_TOKEN`. URL и токен можно передать аргументами:
 
 ```bash
-./authentik/scripts/apply-farmadoc-blueprint.sh http://localhost:9000 ваш-токен
+./authentik/scripts/authentik-setup.sh http://localhost:9000 ваш-токен
 ```
 
 Если Authentik уже запущен и нужно только применить blueprint (без шагов 2–3):
 
 ```bash
-SKIP_DOCKER_SETUP=1 ./authentik/scripts/apply-farmadoc-blueprint.sh
+SKIP_DOCKER_SETUP=1 ./authentik/scripts/authentik-setup.sh
 ```
 
 Ожидание API по умолчанию: до 60 попыток каждые 2 с. Задать свои значения: `AUTHENTIK_WAIT_ATTEMPTS=90` и/или `AUTHENTIK_WAIT_DELAY=3`.
@@ -104,7 +105,7 @@ SKIP_DOCKER_SETUP=1 ./authentik/scripts/apply-farmadoc-blueprint.sh
 
 **Опционально (bootstrap):** `AUTHENTIK_BOOTSTRAP_TOKEN`, `AUTHENTIK_BOOTSTRAP_PASSWORD`, `AUTHENTIK_BOOTSTRAP_EMAIL` — передаются в контейнеры authentik-server и authentik-worker через `docker-compose.yml`.
 
-**Опционально (скрипт apply-farmadoc-blueprint.sh):** `AUTHENTIK_WAIT_ATTEMPTS` (по умолчанию 60), `AUTHENTIK_WAIT_DELAY` (с, по умолчанию 2) — число попыток и интервал при ожидании готовности API. `POSTGRES_DB` — основная БД postgres (по умолчанию `postgres`), используется скриптом для проверки/создания БД `authentik`.
+**Опционально (скрипт authentik-setup.sh):** `AUTHENTIK_WAIT_ATTEMPTS` (по умолчанию 60), `AUTHENTIK_WAIT_DELAY` (с, по умолчанию 2) — число попыток и интервал при ожидании готовности API. `POSTGRES_DB` — основная БД postgres (по умолчанию `postgres`), используется скриптом для проверки/создания БД `authentik`.
 
 ---
 
@@ -120,18 +121,18 @@ SKIP_DOCKER_SETUP=1 ./authentik/scripts/apply-farmadoc-blueprint.sh
 
 ### Если bootstrap не создал токен
 
-Если скрипт `apply-farmadoc-blueprint.sh` выдаёт **403 "Token invalid/expired"**, значит токен из `AUTHENTIK_BOOTSTRAP_TOKEN` в этой установке не был создан (bootstrap не сработал или БД пересоздавалась). Сделайте следующее:
+Если скрипт `authentik-setup.sh` выдаёт **403 "Token invalid/expired"**, значит токен из `AUTHENTIK_BOOTSTRAP_TOKEN` в этой установке не был создан (bootstrap не сработал или БД пересоздавалась). Сделайте следующее:
 
 1. **Первый вход (если ещё не делали):** откройте `http://localhost:9000/if/flow/initial-setup/` и задайте пароль для пользователя **akadmin**.
 2. **Войдите в панель:** `http://localhost:9000` — логин **akadmin**, пароль из шага 1 (или из `AUTHENTIK_BOOTSTRAP_PASSWORD`, если задавали).
 3. **Создайте API-токен:** **System** → **Tokens** → **Create** → укажите Identifier (например `blueprint-apply`) → **Create** → скопируйте выданный токен (показывается один раз).
 4. **Примените blueprint с этим токеном** (сервисы уже запущены, шаги 2–3 скрипта пропускаем):
    ```bash
-   SKIP_DOCKER_SETUP=1 ./authentik/scripts/apply-farmadoc-blueprint.sh http://localhost:9000 'ваш-скопированный-токен'
+   SKIP_DOCKER_SETUP=1 ./authentik/scripts/authentik-setup.sh http://localhost:9000 'ваш-скопированный-токен'
    ```
    Либо добавьте в `.env`: `AUTHENTIK_TOKEN=ваш-токен` и выполните:
    ```bash
-   SKIP_DOCKER_SETUP=1 ./authentik/scripts/apply-farmadoc-blueprint.sh
+   SKIP_DOCKER_SETUP=1 ./authentik/scripts/authentik-setup.sh
    ```
 
 После этого провайдер и приложение появятся в **Directory → Providers** и **Directory → Applications**.
@@ -154,7 +155,7 @@ http://authentik-server:9000/application/o/<slug>/.well-known/openid-configurati
 
 **Проверка:** откройте URL issuer в браузере (с хоста: `http://localhost:9000/application/o/<slug>/.well-known/openid-configuration/`) — должен вернуться JSON с `issuer`, `jwks_uri`, `authorization_endpoint` и др. Запрос к `http://localhost:8001/api/...` без токена — 401; с валидным Bearer-токеном от Authentik — ответ от backend.
 
-Подробнее: [kong.md](../../docs/kong.md).
+Подробнее: [kong/doc/kong.md](../../kong/doc/kong.md).
 
 ---
 
@@ -177,7 +178,7 @@ docker compose stop authentik-server authentik-worker
 
 ## Ручная настройка OIDC в UI
 
-Если вы не используете blueprint и создаёте провайдер и приложение вручную.
+Если вы не используете blueprint и создаёте провайдер и приложение вручную. Готовый чеклист с конкретными значениями (провайдер `farmadoc_public_explicit_authentication_flow`, приложение `farmadoc_app`, redirect `http://localhost:3000/callback`) — см. [manual-provider-app-settings.md](manual-provider-app-settings.md).
 
 ### Создание провайдера (OpenID Connect Provider)
 
@@ -215,7 +216,7 @@ docker compose stop authentik-server authentik-worker
 **Способы применения:**
 
 1. **Веб:** **Customization** → **Blueprints** → **Apply blueprint** → загрузить файл `authentik/blueprints/farmadoc-oidc.yaml`.
-2. **Скрипт (рекомендуется):** из корня репозитория — `./authentik/scripts/apply-farmadoc-blueprint.sh` с заданными `AUTHENTIK_URL` и `AUTHENTIK_TOKEN` (или `AUTHENTIK_BOOTSTRAP_TOKEN`). Скрипт пробует несколько вариантов API и применяет blueprint при первом успешном.
+2. **Скрипт (рекомендуется):** из корня репозитория — `./authentik/scripts/authentik-setup.sh` с заданными `AUTHENTIK_URL` и `AUTHENTIK_TOKEN` (или `AUTHENTIK_BOOTSTRAP_TOKEN`). Скрипт пробует несколько вариантов API и применяет blueprint при первом успешном.
 3. **API вручную:** токен в **System → Tokens**; эндпоинты и схема — `http://localhost:9000/api/v3/schema/swagger/`. Порядок: создать managed blueprint с содержимым YAML, затем вызвать apply для созданного экземпляра.
 
 **Изменение redirect URI:** отредактируйте массив `redirect_uris` в `farmadoc-oidc.yaml` и примените blueprint заново или измените провайдер в UI.
@@ -234,15 +235,20 @@ docker compose stop authentik-server authentik-worker
 |--------|----------|
 | В браузере «failed to connect to authentik backend: authentik starting» | Сервер ещё поднимается (миграции 1–3 мин). Подождите, обновите страницу. Логи: `docker compose logs -f authentik-server`. |
 | В логах «database \"authentik\" does not exist» | БД не создана (postgres был запущен до добавления init-скрипта). Создайте БД: `docker exec postgres psql -U postgres -d postgres -c "CREATE DATABASE authentik;"` (при другом пользователе: `-U $POSTGRES_USER`), затем `docker compose restart authentik-server authentik-worker`. |
-| Скрипт apply-farmadoc-blueprint.sh: «Authentik API не ответил за отведённое время» | Увеличьте ожидание: `AUTHENTIK_WAIT_ATTEMPTS=90 AUTHENTIK_WAIT_DELAY=3 ./authentik/scripts/apply-farmadoc-blueprint.sh`. Проверьте логи: `docker compose logs -f authentik-server`. |
+| Скрипт authentik-setup.sh: «Authentik API не ответил за отведённое время» | Увеличьте ожидание: `AUTHENTIK_WAIT_ATTEMPTS=90 AUTHENTIK_WAIT_DELAY=3 ./authentik/scripts/authentik-setup.sh`. Проверьте логи: `docker compose logs -f authentik-server`. |
 | Скрипт: «Token invalid/expired» или HTTP 401/403 | Bootstrap не создал токен в этой установке. Пошагово: раздел [Если bootstrap не создал токен](#если-bootstrap-не-создал-токен) выше — initial-setup, вход в панель, создание токена в **System** → **Tokens**, затем запуск скрипта с `SKIP_DOCKER_SETUP=1` и новым токеном. |
 | Скрипт: HTTP 405 при применении blueprint | Blueprint смонтирован в контейнер (`/blueprints/farmadoc/farmadoc-oidc.yaml`) и будет применён автоматически (до ~60 мин или при изменении файла). Ускорить: `touch authentik/blueprints/farmadoc-oidc.yaml` или `docker compose restart authentik-worker`. Либо вручную: **Customization** → **Blueprints** → **Apply blueprint** → загрузить `authentik/blueprints/farmadoc-oidc.yaml`. |
 | Bootstrap не создал токен / не задал пароль | Выполните initial-setup: `http://localhost:9000/if/flow/initial-setup/`, затем **System** → **Tokens** → Create и сохраните токен. См. также [Если bootstrap не создал токен](#если-bootstrap-не-создал-токен). |
 | Порт 9000 занят при SSH-туннеле | Используйте другой локальный порт: `ssh -L 9001:localhost:9000 user@remote-host`, затем `http://localhost:9001` (и при вызове скрипта: `AUTHENTIK_URL=http://localhost:9001`). |
+| В логах «NotificationTransportError: [Errno 111] Connection refused» | Authentik пытается отправить уведомление по email (SMTP localhost:25). В blueprint **`farmadoc-oidc.yaml`** включено отключение email-транспорта: правила уведомлений переведены на только локальный транспорт. После применения blueprint ошибка исчезнет. Ускорить: `touch authentik/blueprints/farmadoc-oidc.yaml` или `docker compose restart authentik-worker`. |
+
+### Отключение email-транспорта уведомлений
+
+Если SMTP не настроен, в логах появляется ошибка отправки уведомлений. В blueprint **`authentik/blueprints/farmadoc-oidc.yaml`** добавлены записи, которые обновляют четыре правила уведомлений по умолчанию так, чтобы использовался только транспорт «default-local-transport» (уведомления в UI), без email.
 
 ---
 
 ## См. также
 
-- [kong.md](../../docs/kong.md) — API Gateway, плагин OpenID Connect
+- [kong/doc/kong.md](../../kong/doc/kong.md) — API Gateway, плагин OpenID Connect
 - [auth-flow.md](../../docs/auth-flow.md) — схема OAuth2/OIDC: приложение → Authentik → Kong → backend

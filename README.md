@@ -48,13 +48,13 @@ docker compose up -d
 
 **Authentik** — сервер авторизации (IdP): логин, выдача токенов для браузера. На первом этапе используйте HTTP: порт **9000**. Использует Redis и отдельную БД `authentik` на том же PostgreSQL. Первый вход: `http://localhost:9000/if/flow/initial-setup/`.
 
-Подробнее: [docs/kong.md](docs/kong.md), [authentik/doc/authentik.md](authentik/doc/authentik.md), [docs/auth-flow.md](docs/auth-flow.md).
+Подробнее: [kong/doc/kong.md](kong/doc/kong.md), [authentik/doc/authentik.md](authentik/doc/authentik.md), [docs/auth-flow.md](docs/auth-flow.md).
 
 ## Дополнительная документация
 
 - [docs/milvus-n8n.md](docs/milvus-n8n.md) — Milvus и n8n
 - [docs/vllm.md](docs/vllm.md) — vLLM, модели, GPU
-- [docs/kong.md](docs/kong.md) — Kong, OIDC, backend
+- [kong/doc/kong.md](kong/doc/kong.md) — Kong, OIDC, backend
 - [authentik/doc/authentik.md](authentik/doc/authentik.md) — Authentik: установка (bootstrap + скрипт), OIDC, ручная настройка провайдера
 - [docs/auth-flow.md](docs/auth-flow.md) — поток: браузер ↔ Authentik ↔ Kong ↔ backend
 - [docs/docker-without-sudo.md](docs/docker-without-sudo.md) — запуск Docker без sudo

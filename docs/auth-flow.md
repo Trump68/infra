@@ -23,4 +23,4 @@
 - **Provider** типа OpenID Connect и **Application** с redirect URIs вашего SPA.
 - Issuer / discovery URL этого провайдера указать в Kong (`kong/kong.yml`, плагин openid-connect), чтобы Kong доверял только токенам от этого IdP.
 
-Подробнее: [authentik/doc/authentik.md](../authentik/doc/authentik.md), [kong.md](kong.md).
+Подробнее: [authentik/doc/authentik.md](../authentik/doc/authentik.md), [kong/doc/kong.md](../kong/doc/kong.md).
