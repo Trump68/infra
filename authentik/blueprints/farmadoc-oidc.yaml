@@ -1,5 +1,5 @@
 # Blueprint: провайдер OAuth2/OIDC и приложение Farmadoc для Kong + SPA.
-# Применение: через API (см. docs/authentik_setup.md) или загрузку в UI (Customization → Blueprints).
+# Применение: через API (см. authentik/doc/authentik.md) или загрузку в UI (Customization → Blueprints).
 # Требует уже созданные потоки: default-authentication-flow, default-provider-authorization-explicit-consent
 # и ключ подписи "authentik Self-signed Certificate".
 

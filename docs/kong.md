@@ -9,7 +9,7 @@
 ## Запуск
 
 1. По умолчанию Kong проксирует на **placeholder-сервис backend** (nginx в compose) — цепочку можно проверить без внешнего API. Для реального backend замените в `kong/kong.yml` url на свой (например `http://host.docker.internal:8080` для сервиса на хосте).
-2. Убедитесь, что **issuer** в плагине openid-connect совпадает с URL discovery провайдера Authentik (см. [authentik.md](authentik.md)).
+2. Убедитесь, что **issuer** в плагине openid-connect совпадает с URL discovery провайдера Authentik (см. [authentik/doc/authentik.md](../authentik/doc/authentik.md)).
 
 3. Поднимите сервисы (включая placeholder backend):
    ```bash

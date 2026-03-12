@@ -1,6 +1,6 @@
 # Kong declarative config (DB-less)
 # Backend: по умолчанию — placeholder-сервис backend (nginx) в compose. Для реального API замените url на свой BACKEND_URL.
-# OIDC issuer: замените на URL discovery вашего Authentik Provider (см. docs/authentik.md).
+# OIDC issuer: замените на URL discovery вашего Authentik Provider (см. authentik/doc/authentik.md).
 
 _format_version: "3.0"
 
