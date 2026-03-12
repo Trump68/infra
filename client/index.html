@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Farmadoc — OIDC (Kong + Authentik)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    button { padding: 0.5rem 1rem; margin-right: 0.5rem; margin-bottom: 0.5rem; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    pre { background: #f5f5f5; padding: 0.75rem; border-radius: 4px; overflow: auto; font-size: 0.85rem; }
+    .error { color: #c00; }
+    .ok { color: #060; }
+    .muted { color: #666; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Farmadoc — OIDC (Kong + Authentik)</h1>
+  <p class="muted">Продакшен-клиент: Authorization Code + PKCE, конфиг из BFF.</p>
+
+  <div class="card">
+    <p id="status">Загрузка конфигурации…</p>
+    <button id="btnLogin" type="button" disabled>Войти через Authentik</button>
+    <button id="btnApi" type="button" disabled>Вызвать API через Kong</button>
+    <button id="btnLogout" type="button" style="visibility: hidden;">Выйти</button>
+  </div>
+
+  <div class="card">
+    <strong>Ответ API:</strong>
+    <pre id="apiResult">—</pre>
+  </div>
+
+  <script>
+    (function () {
+      const CALLBACK_PATH = '/callback';
+      let config = { oidcDiscoveryUrl: '', clientId: '', redirectUri: '', apiBaseUrl: '' };
+      let accessToken = '';
+      try {
+        accessToken = sessionStorage.getItem('access_token') || '';
+      } catch (_) {}
+
+      const statusEl = document.getElementById('status');
+      const btnLogin = document.getElementById('btnLogin');
+      const btnApi = document.getElementById('btnApi');
+      const btnLogout = document.getElementById('btnLogout');
+      const apiResult = document.getElementById('apiResult');
+
+      function setStatus(text, isError) {
+        statusEl.textContent = text;
+        statusEl.className = isError ? 'error' : 'ok';
+      }
+
+      function base64UrlEncode(buf) {
+        const bin = String.fromCharCode.apply(null, new Uint8Array(buf));
+        return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+
+      function randomString(length) {
+        const arr = new Uint8Array(length);
+        crypto.getRandomValues(arr);
+        return base64UrlEncode(arr.buffer);
+      }
+
+      function sha256Bytes(data) {
+        return crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
+      }
+
+      async function pkceChallenge(verifier) {
+        const hash = await sha256Bytes(verifier);
+        return base64UrlEncode(hash);
+      }
+
+      function loadConfig() {
+        return fetch('/config.json')
+          .then(r => r.json())
+          .then(c => {
+            config.oidcDiscoveryUrl = c.oidcDiscoveryUrl || c.oidcIssuer || '';
+            config.clientId = c.clientId || '';
+            config.redirectUri = c.redirectUri || (window.location.origin + CALLBACK_PATH);
+            config.apiBaseUrl = (c.apiBaseUrl || '').replace(/\/$/, '');
+            return config;
+          })
+          .catch(e => {
+            setStatus('Ошибка загрузки конфига: ' + e.message, true);
+            throw e;
+          });
+      }
+
+      function updateUI() {
+        if (accessToken) {
+          setStatus('Авторизован. Токен получен.');
+          btnLogin.disabled = true;
+          btnApi.disabled = false;
+          btnLogout.style.visibility = 'visible';
+        } else {
+          setStatus('Не авторизован.');
+          btnLogin.disabled = false;
+          btnApi.disabled = true;
+          btnLogout.style.visibility = 'hidden';
+        }
+      }
+
+      async function handleCallback() {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        const state = params.get('state');
+        const path = window.location.pathname;
+        if ((path === CALLBACK_PATH || path === CALLBACK_PATH + '/') && code && state) {
+          const savedState = sessionStorage.getItem('oidc_state');
+          const codeVerifier = sessionStorage.getItem('oidc_code_verifier');
+          sessionStorage.removeItem('oidc_state');
+          sessionStorage.removeItem('oidc_code_verifier');
+          if (savedState !== state || !codeVerifier) {
+            setStatus('Ошибка: неверный state или истёк code_verifier.', true);
+            apiResult.textContent = 'Повторите вход.';
+            updateUI();
+            return true;
+          }
+          apiResult.textContent = 'Обмен code на токен (PKCE)…';
+          try {
+            const res = await fetch('/auth/exchange', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code, code_verifier: codeVerifier, redirect_uri: config.redirectUri })
+            });
+            const data = await res.json();
+            if (data.access_token) {
+              accessToken = data.access_token;
+              try { sessionStorage.setItem('access_token', accessToken); } catch (_) {}
+              window.history.replaceState({}, '', '/');
+              updateUI();
+              apiResult.textContent = 'Токен получен. Нажмите «Вызвать API через Kong».';
+            } else {
+              apiResult.textContent = 'Ошибка: ' + JSON.stringify(data, null, 2);
+              apiResult.classList.add('error');
+              setStatus('Ошибка обмена токена.', true);
+            }
+          } catch (e) {
+            apiResult.textContent = 'Ошибка запроса: ' + e.message;
+            apiResult.classList.add('error');
+            setStatus('Ошибка обмена токена.', true);
+          }
+          updateUI();
+          return true;
+        }
+        return false;
+      }
+
+      btnLogin.addEventListener('click', async function () {
+        if (!config.oidcDiscoveryUrl || !config.clientId) {
+          setStatus('Не заданы oidcDiscoveryUrl или clientId в конфиге.', true);
+          return;
+        }
+        setStatus('Загрузка discovery…');
+        let discovery;
+        try {
+          const r = await fetch(config.oidcDiscoveryUrl);
+          discovery = await r.json();
+          if (!discovery.authorization_endpoint) throw new Error('Нет authorization_endpoint');
+        } catch (e) {
+          setStatus('Ошибка discovery: ' + e.message, true);
+          return;
+        }
+        const codeVerifier = randomString(32);
+        const codeChallenge = await pkceChallenge(codeVerifier);
+        const state = randomString(16);
+        try {
+          sessionStorage.setItem('oidc_state', state);
+          sessionStorage.setItem('oidc_code_verifier', codeVerifier);
+        } catch (_) {
+          setStatus('Ошибка sessionStorage.', true);
+          return;
+        }
+        const authUrl = discovery.authorization_endpoint
+          + (discovery.authorization_endpoint.includes('?') ? '&' : '?')
+          + 'response_type=code'
+          + '&client_id=' + encodeURIComponent(config.clientId)
+          + '&redirect_uri=' + encodeURIComponent(config.redirectUri)
+          + '&scope=openid'
+          + '&code_challenge=' + encodeURIComponent(codeChallenge)
+          + '&code_challenge_method=S256'
+          + '&state=' + encodeURIComponent(state);
+        window.location.href = authUrl;
+      });
+
+      btnApi.addEventListener('click', function () {
+        if (!accessToken) return;
+        apiResult.textContent = 'Запрос…';
+        apiResult.classList.remove('error');
+        const apiUrl = config.apiBaseUrl ? (config.apiBaseUrl + '/api/') : '/api/';
+        fetch(apiUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } })
+          .then(r => r.text().then(t => ({ status: r.status, body: t })))
+          .then(({ status, body }) => {
+            apiResult.textContent = 'HTTP ' + status + '\n\n' + body;
+            if (status >= 400) apiResult.classList.add('error');
+          })
+          .catch(e => {
+            apiResult.textContent = 'Ошибка: ' + e.message;
+            apiResult.classList.add('error');
+          });
+      });
+
+      btnLogout.addEventListener('click', function () {
+        accessToken = '';
+        try {
+          sessionStorage.removeItem('access_token');
+        } catch (_) {}
+        updateUI();
+        apiResult.textContent = '—';
+        apiResult.classList.remove('error');
+      });
+
+      loadConfig()
+        .then(() => {
+          if (!config.oidcDiscoveryUrl || !config.clientId) {
+            setStatus('В конфиге не заданы oidcDiscoveryUrl и clientId.', true);
+            return;
+          }
+          btnLogin.disabled = false;
+          return handleCallback();
+        })
+        .then(handled => { if (!handled) updateUI(); })
+        .catch(() => {});
+    })();
+  </script>
+</body>
+</html>

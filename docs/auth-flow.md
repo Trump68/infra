@@ -23,4 +23,6 @@
 - **Provider** типа OpenID Connect и **Application** с redirect URIs вашего SPA.
 - Issuer / discovery URL этого провайдера указать в Kong (`kong/kong.yml`, плагин openid-connect), чтобы Kong доверял только токенам от этого IdP.
 
+**Пример продакшен-клиента:** в репозитории есть SPA в каталоге [client/](../client/) — OIDC (Authorization Code + PKCE), конфиг из BFF, вызов API через Kong. См. [client/README.md](../client/README.md). Сравнение статического SPA и SPA + BFF с точки зрения безопасности — [client/spa-vs-bff.md](../client/spa-vs-bff.md).
+
 Подробнее: [authentik/doc/authentik.md](../authentik/doc/authentik.md), [kong/doc/kong.md](../kong/doc/kong.md).

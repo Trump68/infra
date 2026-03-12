@@ -155,6 +155,8 @@ http://authentik-server:9000/application/o/<slug>/.well-known/openid-configurati
 
 **Проверка:** откройте URL issuer в браузере (с хоста: `http://localhost:9000/application/o/<slug>/.well-known/openid-configuration/`) — должен вернуться JSON с `issuer`, `jwks_uri`, `authorization_endpoint` и др. Запрос к `http://localhost:8001/api/...` без токена — 401; с валидным Bearer-токеном от Authentik — ответ от backend.
 
+**Тестовый SPA-клиент:** для проверки входа и вызова API через Kong запустите `python3 authentik/spa-test/serve.py` и откройте http://localhost:3000/ — см. [authentik/spa-test/README.md](../spa-test/README.md).
+
 Подробнее: [kong/doc/kong.md](../../kong/doc/kong.md).
 
 ---

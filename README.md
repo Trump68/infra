@@ -57,5 +57,7 @@ docker compose up -d
 - [kong/doc/kong.md](kong/doc/kong.md) — Kong, OIDC, backend
 - [authentik/doc/authentik.md](authentik/doc/authentik.md) — Authentik: установка (bootstrap + скрипт), OIDC, ручная настройка провайдера
 - [docs/auth-flow.md](docs/auth-flow.md) — поток: браузер ↔ Authentik ↔ Kong ↔ backend
+- [client/spa-vs-bff.md](client/spa-vs-bff.md) — статический SPA и SPA + BFF: сравнение и безопасность
+- [client/README.md](client/README.md) — продакшен-SPA (OIDC + PKCE), запуск и развёртывание
 - [docs/docker-without-sudo.md](docs/docker-without-sudo.md) — запуск Docker без sudo
 - [docs/nvidia-driver-ubuntu.md](docs/nvidia-driver-ubuntu.md) — установка драйвера NVIDIA на Ubuntu
