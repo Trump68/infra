@@ -8,9 +8,11 @@
 
 ```bash
 cp .env.example .env
-# Заполните AUTHENTIK_SECRET_KEY (и POSTGRES_* для postgres) для Authentik
+# Отредактируйте .env: задайте AUTHENTIK_SECRET_KEY и при необходимости POSTGRES_USER/POSTGRES_PASSWORD (postgres и Authentik используют один инстанс)
 docker compose up -d
 ```
+
+**Откуда взять значения:** `AUTHENTIK_SECRET_KEY` — сгенерируйте случайную строку, например: `openssl rand -base64 48`. `POSTGRES_USER` и `POSTGRES_PASSWORD` — придумайте сами (логин/пароль БД PostgreSQL); для локальной разработки можно оставить по умолчанию `postgres` / `postgres`, если в `.env.example` они закомментированы — раскомментируйте и подставьте или добавьте в `.env`.
 
 Полный стек: etcd, minio, milvus, vllm_emb, postgres, redis, authentik-server, authentik-worker, backend (placeholder), kong. Только Milvus: `docker compose up -d etcd minio milvus`. Только авторизация: `docker compose up -d postgres redis authentik-server authentik-worker backend kong`.
 
@@ -54,6 +56,7 @@ docker compose up -d
 - [docs/vllm.md](docs/vllm.md) — vLLM, модели, GPU
 - [docs/kong.md](docs/kong.md) — Kong, OIDC, backend
 - [docs/authentik.md](docs/authentik.md) — Authentik, OIDC Provider
+- [docs/authentik_setup.md](docs/authentik_setup.md) — пошаговая настройка форм создания OAuth2/OIDC провайдера
 - [docs/auth-flow.md](docs/auth-flow.md) — поток: браузер ↔ Authentik ↔ Kong ↔ backend
 - [docs/docker-without-sudo.md](docs/docker-without-sudo.md) — запуск Docker без sudo
 - [docs/nvidia-driver-ubuntu.md](docs/nvidia-driver-ubuntu.md) — установка драйвера NVIDIA на Ubuntu

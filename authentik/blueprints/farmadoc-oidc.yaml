@@ -1,0 +1,45 @@
+# Blueprint: провайдер OAuth2/OIDC и приложение Farmadoc для Kong + SPA.
+# Применение: через API (см. docs/authentik_setup.md) или загрузку в UI (Customization → Blueprints).
+# Требует уже созданные потоки: default-authentication-flow, default-provider-authorization-explicit-consent
+# и ключ подписи "authentik Self-signed Certificate".
+
+version: 1
+metadata:
+  name: Farmadoc OIDC Provider and Application
+
+entries:
+  # Провайдер OAuth2/OIDC (slug будет сгенерирован из name, например farmadoc-oidc)
+  - id: farmadoc_provider
+    model: authentik_providers_oauth2.oauth2provider
+    identifiers:
+      name: Farmadoc OIDC
+    attrs:
+      name: Farmadoc OIDC
+      client_type: public
+      redirect_uris:
+        - url: http://localhost:3000/callback
+          matching_mode: strict
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+      authentication_flow: !Find [authentik_flows.flow, [slug, default-authentication-flow]]
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
+      access_code_validity: "minutes=1"
+      access_token_validity: "hours=1"
+      refresh_token_validity: "days=30"
+      include_claims_in_id_token: true
+      issuer_mode: per_provider
+      sub_mode: hashed_user_id
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+
+  # Приложение Farmadoc, привязанное к провайдеру
+  - model: authentik_core.application
+    identifiers:
+      slug: farmadoc_client
+    attrs:
+      name: farmadoc_client
+      slug: farmadoc_client
+      provider: !KeyOf farmadoc_provider
+      group: farmadoc
+      policy_engine_mode: any
