@@ -176,7 +176,30 @@ Authentik поддерживает **Blueprints** — YAML-описание пр
 
 **Способ 1 — через веб-интерфейс:** **Customization** → **Blueprints** → **Apply blueprint** → загрузить файл `authentik/blueprints/farmadoc-oidc.yaml`.
 
-**Способ 2 — через API:**
+**Способ 2 — скрипт (рекомендуется):** из корня репозитория выполнить:
+```bash
+AUTHENTIK_URL="http://localhost:9000" AUTHENTIK_TOKEN="ваш-api-токен" ./authentik/scripts/apply-farmadoc-blueprint.sh
+```
+Или: `./authentik/scripts/apply-farmadoc-blueprint.sh http://localhost:9000 ваш-токен`. Скрипт пробует несколько вариантов API (flow import, managed blueprint с content, file upload) и применяет blueprint при первом успешном. Нужны `curl` и `jq` или `python3`.
+
+**Где взять токен:** панель Authentik → **System** → **Tokens** → **Create** → задайте Identifier → Create. Токен отображается один раз — скопируйте и сохраните.
+
+#### Автоматизация токена (bootstrap)
+
+При **первом** запуске Authentik можно не создавать токен вручную, а задать его через переменные окружения — тогда при инициализации будет создан аккаунт `akadmin` и выдан API-токен:
+
+- В `.env` (или в `environment` контейнеров) задайте:
+  - `AUTHENTIK_BOOTSTRAP_TOKEN` — значение, которое станет первым API-токеном для akadmin (например сгенерируйте: `openssl rand -base64 32`);
+  - `AUTHENTIK_BOOTSTRAP_PASSWORD` — пароль пользователя akadmin (если не задан, при первом входе потребуется initial-setup);
+  - при необходимости `AUTHENTIK_BOOTSTRAP_EMAIL` — email для akadmin.
+- Эти переменные должны быть переданы в контейнер **authentik-worker** (и при необходимости в authentik-server — см. [документацию Authentik](https://docs.goauthentik.io/docs/install-config/automated-install/)).
+- После первого успешного запуска используйте значение `AUTHENTIK_BOOTSTRAP_TOKEN` как `AUTHENTIK_TOKEN` в скрипте применения blueprint:  
+  `AUTHENTIK_URL="http://localhost:9000" AUTHENTIK_TOKEN="$AUTHENTIK_BOOTSTRAP_TOKEN" ./authentik/scripts/apply-farmadoc-blueprint.sh`  
+  Либо задайте в `.env` только `AUTHENTIK_BOOTSTRAP_TOKEN` и в скрипте поддерживается подстановка: если `AUTHENTIK_TOKEN` не задан, скрипт использует `AUTHENTIK_BOOTSTRAP_TOKEN`.
+
+**Ограничения:** в части версий Authentik (2023.8+) bootstrap-переменные не срабатывают при «чистом» первом запуске без blueprints (см. [issue #7546](https://github.com/goauthentik/authentik/issues/7546)); в таких случаях токен всё равно нужно создать один раз вручную в UI и сохранить в `.env` как `AUTHENTIK_TOKEN`. Для последующих запусков и CI удобно хранить уже созданный токен в секретах (например в `AUTHENTIK_TOKEN` в `.env`, не коммитить).
+
+**Способ 3 — через API вручную:**
 
 1. Создать API-токен: **System** → **Tokens** → создать токен с правами на управление blueprints (и при необходимости core/providers).
 2. Создать экземпляр managed blueprint с содержимым YAML и применить его.
