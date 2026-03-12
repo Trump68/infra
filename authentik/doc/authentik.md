@@ -87,6 +87,8 @@ SKIP_DOCKER_SETUP=1 ./authentik/scripts/apply-farmadoc-blueprint.sh
 
 При успехе в **Directory → Providers** и **Directory → Applications** появятся провайдер **Farmadoc OIDC** и приложение **farmadoc_client**.
 
+**Автоматическое применение (file-based):** файл `authentik/blueprints/farmadoc-oidc.yaml` смонтирован в контейнеры Authentik по пути `/blueprints/farmadoc/farmadoc-oidc.yaml`. Authentik обнаруживает YAML в `/blueprints` и применяет их по расписанию (примерно раз в 60 мин) и при изменении файла. Если скрипт не смог применить blueprint через API (например, HTTP 405), конфигурация всё равно будет применена автоматически. Чтобы запустить применение раньше: `touch authentik/blueprints/farmadoc-oidc.yaml` или `docker compose restart authentik-worker`.
+
 ### 5. Интеграция с Kong и SPA
 
 - В **kong/kong.yml** в плагине OpenID Connect укажите `issuer` для созданного провайдера (slug из blueprint — `farmadoc-oidc`):  
@@ -234,7 +236,7 @@ docker compose stop authentik-server authentik-worker
 | В логах «database \"authentik\" does not exist» | БД не создана (postgres был запущен до добавления init-скрипта). Создайте БД: `docker exec postgres psql -U postgres -d postgres -c "CREATE DATABASE authentik;"` (при другом пользователе: `-U $POSTGRES_USER`), затем `docker compose restart authentik-server authentik-worker`. |
 | Скрипт apply-farmadoc-blueprint.sh: «Authentik API не ответил за отведённое время» | Увеличьте ожидание: `AUTHENTIK_WAIT_ATTEMPTS=90 AUTHENTIK_WAIT_DELAY=3 ./authentik/scripts/apply-farmadoc-blueprint.sh`. Проверьте логи: `docker compose logs -f authentik-server`. |
 | Скрипт: «Token invalid/expired» или HTTP 401/403 | Bootstrap не создал токен в этой установке. Пошагово: раздел [Если bootstrap не создал токен](#если-bootstrap-не-создал-токен) выше — initial-setup, вход в панель, создание токена в **System** → **Tokens**, затем запуск скрипта с `SKIP_DOCKER_SETUP=1` и новым токеном. |
-| Скрипт: HTTP 405 при применении blueprint | В части версий Authentik API managed blueprints возвращает 405 на POST с полным телом. Обходной путь: примените blueprint вручную — **Customization** → **Blueprints** → **Apply blueprint** → загрузите файл `authentik/blueprints/farmadoc-oidc.yaml`. |
+| Скрипт: HTTP 405 при применении blueprint | Blueprint смонтирован в контейнер (`/blueprints/farmadoc/farmadoc-oidc.yaml`) и будет применён автоматически (до ~60 мин или при изменении файла). Ускорить: `touch authentik/blueprints/farmadoc-oidc.yaml` или `docker compose restart authentik-worker`. Либо вручную: **Customization** → **Blueprints** → **Apply blueprint** → загрузить `authentik/blueprints/farmadoc-oidc.yaml`. |
 | Bootstrap не создал токен / не задал пароль | Выполните initial-setup: `http://localhost:9000/if/flow/initial-setup/`, затем **System** → **Tokens** → Create и сохраните токен. См. также [Если bootstrap не создал токен](#если-bootstrap-не-создал-токен). |
 | Порт 9000 занят при SSH-туннеле | Используйте другой локальный порт: `ssh -L 9001:localhost:9000 user@remote-host`, затем `http://localhost:9001` (и при вызове скрипта: `AUTHENTIK_URL=http://localhost:9001`). |
 
