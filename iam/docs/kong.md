@@ -8,7 +8,7 @@
 
 ## Запуск
 
-1. По умолчанию Kong проксирует на **placeholder-сервис backend** (nginx в compose). Для реального backend замените в `kong/kong.yml` url на свой (например `http://host.docker.internal:8080`).
+1. По умолчанию Kong проксирует на **placeholder-сервис backend** (nginx в compose). Для реального backend замените в `iam/kong/kong.yml` url на свой (например `http://host.docker.internal:8080`).
 2. Поднимите сервисы (включая placeholder backend):
    ```bash
    docker compose up -d backend kong
@@ -30,7 +30,7 @@
 
 ## Настройка backend
 
-Файл `kong/kong.yml`:
+Файл `iam/kong/kong.yml`:
 
 - **Backend URL:** по умолчанию `http://backend:80` — placeholder-сервис (nginx) в compose. Для реального API замените на адрес своего backend (доступный из сети Kong), например `http://host.docker.internal:8080`. После изменения перезапустите Kong: `docker compose up -d kong`.
 - **Проверка JWT:** в Kong OSS плагин openid-connect недоступен; используется плагин jwt с публичным ключом Authentik (см. раздел «Kong OSS: проверка JWT через плагин jwt»).
@@ -50,11 +50,11 @@
    Без плагина JWT — ответ backend (например HTML от nginx). С включённым плагином jwt — без токена ожидается `401 Unauthorized`.
 
 3. **С валидным Bearer-токеном — ответ backend:**
-   Получите access token через Authentik (OAuth2/OIDC flow для приложения, привязанного к провайдеру из [manual-provider-app-settings.md](../../authentik/doc/manual-provider-app-settings.md)), затем:
+   Получите access token через Authentik (OAuth2/OIDC flow для приложения, привязанного к провайдеру из [authentik.md](authentik.md)#ручная-настройка-oidc-в-ui), затем:
    ```bash
    curl -i -H "Authorization: Bearer <ваш_access_token>" http://localhost:8001/api/
    ```
-   Ожидается ответ от backend (например HTML от placeholder nginx). Если снова 401 — проверьте issuer в `kong/kong.yml` и что токен выдан тем же провайдером Authentik.
+   Ожидается ответ от backend (например HTML от placeholder nginx). Если снова 401 — проверьте issuer в `iam/kong/kong.yml` и что токен выдан тем же провайдером Authentik.
 
 4. **Маршрут не из конфига:** запрос к пути, не входящему в `paths` (например `http://localhost:8001/` или `http://localhost:8001/other`), может вернуть 404 — это нормально, значит Kong обрабатывает только `/api`.
 
@@ -69,42 +69,42 @@ docker compose logs kong --tail 50
 
 - Если контейнер в состоянии **Exited** или постоянно **Restarting** — смотрите логи. Частая причина: в Kong **OSS** плагин **openid-connect** недоступен (только Kong Enterprise). В текущем `kong.yml` плагин openid-connect убран — Kong стартует и проксирует без проверки JWT. Для проверки токенов Authentik настройте плагин **jwt** (см. раздел ниже).
 - Если контейнер **Running**, но порт 8001 не отвечает — проверьте, что порт не занят другим процессом: `ss -tlnp | grep 8001` или `docker compose port kong 8000`.
-- **Connection refused** на `curl http://127.0.0.1:8001/api/` — контейнер мог упасть после старта (ошибка конфига/плагина). Запустите `sudo ./kong/scripts/setup-kong-jwt-auth.sh` — при 000 скрипт выведет `docker compose ps kong` и логи Kong; либо вручную: `sudo docker compose ps kong` и `sudo docker compose logs kong --tail 50`.
+- **Connection refused** на `curl http://127.0.0.1:8001/api/` — контейнер мог упасть после старта (ошибка конфига/плагина). Запустите `sudo ./iam/kong/scripts/setup-kong-jwt-auth.sh` — при 000 скрипт выведет `docker compose ps kong` и логи Kong; либо вручную: `sudo docker compose ps kong` и `sudo docker compose logs kong --tail 50`.
 
 ## Kong OSS: проверка JWT через плагин jwt
 
-В Kong OSS нет плагина openid-connect. В `kong/kong.yml` уже включены плагин **jwt** и consumer **authentik**; нужно подставить реальный публичный ключ (PEM) и `kid` из провайдера Authentik.
+В Kong OSS нет плагина openid-connect. В `iam/kong/kong.yml` уже включены плагин **jwt** и consumer **authentik**; нужно подставить реальный публичный ключ (PEM) и `kid` из провайдера Authentik.
 
 ### Автоматическая настройка (рекомендуется)
 
-Убедитесь, что **Authentik запущен** и провайдер создан (см. [manual-provider-app-settings.md](../../authentik/doc/manual-provider-app-settings.md)). Из **корня репозитория** выполните:
+Убедитесь, что **Authentik запущен** и провайдер создан (см. [authentik.md](authentik.md)#ручная-настройка-oidc-в-ui). Из **корня репозитория** выполните:
 
 ```bash
-./kong/scripts/setup-kong-jwt-auth.sh
+./iam/kong/scripts/setup-kong-jwt-auth.sh
 ```
 
-Скрипт установит при необходимости `cryptography`, запросит JWKS у Authentik (по умолчанию приложение `farmadoc_app`: `http://localhost:9000/application/o/farmadoc_app/jwks/`), обновит секцию `consumers` в `kong/kong.yml` и перезапустит Kong. Для другого приложения/провайдера передайте URL JWKS:
+Скрипт установит при необходимости `cryptography`, запросит JWKS у Authentik (по умолчанию приложение `farmadoc_app`: `http://localhost:9000/application/o/farmadoc_app/jwks/`), обновит секцию `consumers` в `iam/kong/kong.yml` и перезапустит Kong. Для другого приложения/провайдера передайте URL JWKS:
 
 ```bash
-./kong/scripts/setup-kong-jwt-auth.sh "http://localhost:9000/application/o/<slug>/jwks/"
+./iam/kong/scripts/setup-kong-jwt-auth.sh "http://localhost:9000/application/o/<slug>/jwks/"
 ```
 
-Без перезапуска Kong (только обновить конфиг): `./kong/scripts/setup-kong-jwt-auth.sh --no-restart`. Для теста или офлайн можно передать путь к локальному файлу JWKS (JSON): `./kong/scripts/setup-kong-jwt-auth.sh kong/scripts/test-data/jwks-sample.json --no-restart`.
+Без перезапуска Kong (только обновить конфиг): `./iam/kong/scripts/setup-kong-jwt-auth.sh --no-restart`. Для теста или офлайн можно передать путь к локальному файлу JWKS (JSON): `./iam/kong/scripts/setup-kong-jwt-auth.sh iam/kong/scripts/test-data/jwks-sample.json --no-restart`.
 
 ### Пошаговая настройка (вручную)
 
-1. **Запустите Authentik** (и создайте провайдер по [manual-provider-app-settings.md](../../authentik/doc/manual-provider-app-settings.md), если ещё не создан).
+1. **Запустите Authentik** (и создайте провайдер по [authentik.md](authentik.md)#ручная-настройка-oidc-в-ui, если ещё не создан).
 
 2. **Установите зависимость** (один раз): `pip install cryptography`
 
 3. **Получите kid и PEM** из JWKS провайдера:
    ```bash
-   cd kong/scripts
+   cd iam/kong/scripts
    python3 fetch-authentik-jwks-pem.py
    ```
    Для другого приложения: `python3 fetch-authentik-jwks-pem.py "http://localhost:9000/application/o/<slug>/jwks/"`
 
-4. **Подставьте вывод в `kong/kong.yml`:** замените `REPLACE_WITH_KID` на выведенный `kid` и блок `rsa_public_key` — на выведенный PEM. Либо готовую секцию `consumers`: `python3 fetch-authentik-jwks-pem.py --yaml` и вставьте в `kong/kong.yml`. Либо автоматическая подстановка в файл: `python3 fetch-authentik-jwks-pem.py --update ../../kong/kong.yml` (из `kong/scripts`).
+4. **Подставьте вывод в `iam/kong/kong.yml`:** замените `REPLACE_WITH_KID` на выведенный `kid` и блок `rsa_public_key` — на выведенный PEM. Либо готовую секцию `consumers`: `python3 fetch-authentik-jwks-pem.py --yaml` и вставьте в `iam/kong/kong.yml`. Либо автоматическая подстановка в файл: `python3 fetch-authentik-jwks-pem.py --update ../kong.yml` (из `iam/kong/scripts`).
 
 5. **Перезапустите Kong:** `docker compose restart kong`
 
@@ -120,4 +120,4 @@ docker compose logs kong --tail 50
 docker compose stop kong
 ```
 
-Конфигурация хранится в репозитории (`kong/kong.yml`), состояние Kong не персистентное (DB-less).
+Конфигурация хранится в репозитории (`iam/kong/kong.yml`), состояние Kong не персистентное (DB-less).

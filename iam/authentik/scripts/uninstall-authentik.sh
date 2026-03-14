@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Полное удаление установленного Authentik: контейнеры, БД authentik, тома.
-# Запуск из корня репозитория: ./authentik/scripts/uninstall-authentik.sh
+# Запуск из корня репозитория: ./iam/authentik/scripts/uninstall-authentik.sh
 # Опция: -f | --force — без подтверждения.
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 cd "$REPO_ROOT"
 
 # Проверка доступа к Docker (без прав будет permission denied на одном из шагов)
@@ -65,4 +65,4 @@ for vol in $(docker volume ls -q | grep -E '_authentik_media$|_authentik_templat
   docker volume rm "$vol" 2>/dev/null || echo "Предупреждение: не удалось удалить том $vol (возможно, используется)" >&2
 done
 
-echo "Готово. Authentik удалён. Для повторной установки выполните полный цикл из authentik/doc/authentik.md."
+echo "Готово. Authentik удалён. Для повторной установки выполните полный цикл из iam/docs/authentik.md."

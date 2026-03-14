@@ -44,20 +44,17 @@ docker compose up -d
 
 ## Kong и Authentik (OAuth2/OIDC)
 
-**Kong** — API Gateway: единая точка входа для API, проверка JWT через OpenID Connect, проксирование на backend. На первом этапе используйте HTTP: порт **8001**. По умолчанию upstream — placeholder-сервис **backend** (nginx в compose); для реального API замените url в `kong/kong.yml`. Issuer OIDC — URL discovery провайдера Authentik.
+**Kong** — API Gateway: единая точка входа для API, проверка JWT через OpenID Connect, проксирование на backend. На первом этапе используйте HTTP: порт **8001**. По умолчанию upstream — placeholder-сервис **backend** (nginx в compose); для реального API замените url в `iam/kong/kong.yml`. Issuer OIDC — URL discovery провайдера Authentik.
 
 **Authentik** — сервер авторизации (IdP): логин, выдача токенов для браузера. На первом этапе используйте HTTP: порт **9000**. Использует Redis и отдельную БД `authentik` на том же PostgreSQL. Первый вход: `http://localhost:9000/if/flow/initial-setup/`.
 
-Подробнее: [kong/doc/kong.md](kong/doc/kong.md), [authentik/doc/authentik.md](authentik/doc/authentik.md), [docs/auth-flow.md](docs/auth-flow.md).
+Подробнее: [iam/docs/kong.md](iam/docs/kong.md), [iam/docs/authentik.md](iam/docs/authentik.md), [iam/docs/auth-flow.md](iam/docs/auth-flow.md).
 
 ## Дополнительная документация
 
 - [docs/milvus-n8n.md](docs/milvus-n8n.md) — Milvus и n8n
 - [docs/vllm.md](docs/vllm.md) — vLLM, модели, GPU
-- [kong/doc/kong.md](kong/doc/kong.md) — Kong, OIDC, backend
-- [authentik/doc/authentik.md](authentik/doc/authentik.md) — Authentik: установка (bootstrap + скрипт), OIDC, ручная настройка провайдера
-- [docs/auth-flow.md](docs/auth-flow.md) — поток: браузер ↔ Authentik ↔ Kong ↔ backend
-- [client/spa-vs-bff.md](client/spa-vs-bff.md) — статический SPA и SPA + BFF: сравнение и безопасность
-- [client/README.md](client/README.md) — продакшен-SPA (OIDC + PKCE), запуск и развёртывание
+- **iam/docs/** — IAM (Identity and Access Management): [kong.md](iam/docs/kong.md), [authentik.md](iam/docs/authentik.md), [auth-flow.md](iam/docs/auth-flow.md), [frontend.md](iam/docs/frontend.md), [spa-vs-bff.md](iam/docs/spa-vs-bff.md)
+- [iam/frontend/README.md](iam/frontend/README.md) — продакшен-SPA (OIDC + PKCE), запуск из iam/frontend
 - [docs/docker-without-sudo.md](docs/docker-without-sudo.md) — запуск Docker без sudo
 - [docs/nvidia-driver-ubuntu.md](docs/nvidia-driver-ubuntu.md) — установка драйвера NVIDIA на Ubuntu

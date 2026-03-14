@@ -7,7 +7,9 @@
   python3 fetch-authentik-jwks-pem.py [JWKS_URL] --yaml   # готовый YAML для секции consumers
   python3 fetch-authentik-jwks-pem.py [JWKS_URL] --update kong/kong.yml   # подставить в файл и вывести путь
   JWKS_URL по умолчанию: http://localhost:9000/application/o/farmadoc_app/jwks/
+  Для приложения с slug farmadoc-app: .../farmadoc-app/jwks/
 Вывод: kid и PEM (вставить в kong/kong.yml в consumer.jwt_secrets) или готовая секция consumers при --yaml.
+  После обновления kong.yml: docker compose restart kong
 """
 import json
 import sys
@@ -41,18 +43,19 @@ def jwk_to_pem(jwk: dict) -> str:
     return pem.decode()
 
 
-def build_consumers_yaml(kid: str, pem: str) -> str:
-    pem_indent = "\n".join("          " + line for line in pem.strip().split("\n"))
-    return (
-        "consumers:\n"
-        "  - username: authentik\n"
-        "    jwt_secrets:\n"
-        f"      - key: {kid}\n"
-        "        algorithm: RS256\n"
-        '        secret: "dummy"\n'
-        "        rsa_public_key: |\n"
-        f"{pem_indent}\n\n"
-    )
+def build_consumers_yaml(keys_data):
+    """keys_data = [(kid, pem), ...] — все ключи из JWKS для Kong (JWT по kid из токена)."""
+    secrets = []
+    for kid, pem in keys_data:
+        pem_indent = "\n".join("          " + line for line in pem.strip().split("\n"))
+        secrets.append(
+            f"      - key: {kid}\n"
+            "        algorithm: RS256\n"
+            '        secret: "dummy"\n'
+            "        rsa_public_key: |\n"
+            f"{pem_indent}\n"
+        )
+    return "consumers:\n  - username: authentik\n    jwt_secrets:\n" + "".join(secrets) + "\n"
 
 
 def update_kong_yml(kong_yml_path: str, new_consumers: str) -> None:
@@ -94,16 +97,22 @@ def main():
     if not keys:
         print("В JWKS нет ключей", file=sys.stderr)
         sys.exit(3)
-    key = None
+    keys_data = []
     for k in keys:
-        if k.get("kty") == "RSA" and (k.get("use") in (None, "sig")):
-            key = k
-            break
-    if not key:
+        if k.get("kty") != "RSA" or k.get("use") not in (None, "sig"):
+            continue
+        try:
+            kid = k.get("kid") or "authentik-key"
+            pem = jwk_to_pem(k)
+            keys_data.append((kid, pem))
+        except Exception as e:
+            print(f"Пропуск ключа {k.get('kid')}: {e}", file=sys.stderr)
+    if not keys_data:
         key = keys[0]
-    kid = key.get("kid") or "authentik-key"
-    pem = jwk_to_pem(key)
-    consumers_yaml = build_consumers_yaml(kid, pem)
+        kid = key.get("kid") or "authentik-key"
+        pem = jwk_to_pem(key)
+        keys_data = [(kid, pem)]
+    consumers_yaml = build_consumers_yaml(keys_data)
     if opt_update:
         path = os.path.abspath(opt_update)
         update_kong_yml(path, consumers_yaml)
@@ -112,10 +121,12 @@ def main():
         print("# Замените в kong/kong.yml секцию consumers на:")
         print(consumers_yaml, end="")
     else:
-        print("# kid (подставить в kong.yml в jwt_secrets[].key):")
-        print(kid)
-        print("# rsa_public_key (подставить в kong.yml в jwt_secrets[].rsa_public_key):")
-        print(pem.strip())
+        for i, (kid, pem) in enumerate(keys_data):
+            print(f"# Ключ {i + 1} kid (подставить в kong.yml в jwt_secrets[].key):")
+            print(kid)
+            print("# rsa_public_key:")
+            print(pem.strip())
+            print()
 
 
 if __name__ == "__main__":

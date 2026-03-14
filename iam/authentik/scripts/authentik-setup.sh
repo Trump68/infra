@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # Установка Authentik: по умолчанию только инфраструктура (PostgreSQL, БД authentik, Redis, server, worker).
-# С опцией -e|--export — дополнительно загрузка чертежа в Authentik и экспорт в authentik/blueprints/.
+# С опцией -e|--export — дополнительно загрузка чертежа в Authentik и экспорт в iam/authentik/blueprints/.
 # Запуск из корня репозитория. Требует: .env с POSTGRES_*; для --export также AUTHENTIK_TOKEN (или AUTHENTIK_BOOTSTRAP_TOKEN).
 # Использование:
-#   ./authentik/scripts/authentik-setup.sh
-#   ./authentik/scripts/authentik-setup.sh --export
-#   ./authentik/scripts/authentik-setup.sh -e http://localhost:9000 your-token
+#   ./iam/authentik/scripts/authentik-setup.sh
+#   ./iam/authentik/scripts/authentik-setup.sh --export
+#   ./iam/authentik/scripts/authentik-setup.sh -e http://localhost:9000 your-token
 # Пропуск шагов инфраструктуры (только загрузка чертежа к уже запущенному Authentik):
-#   SKIP_DOCKER_SETUP=1 ./authentik/scripts/authentik-setup.sh --export
+#   SKIP_DOCKER_SETUP=1 ./iam/authentik/scripts/authentik-setup.sh --export
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-BLUEPRINT_FILE="${REPO_ROOT}/authentik/blueprints/farmadoc-oidc.yaml"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+BLUEPRINT_FILE="${REPO_ROOT}/iam/authentik/blueprints/farmadoc-oidc.yaml"
 EXPORT_BLUEPRINT_NAME="${EXPORT_BLUEPRINT_NAME:-Farmadoc OIDC Provider and Application}"
 
 # Разбор аргументов: -e|--export и позиционные [AUTHENTIK_URL] [AUTHENTIK_TOKEN]

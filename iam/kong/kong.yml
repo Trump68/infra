@@ -1,0 +1,45 @@
+# Kong declarative config (DB-less)
+# Backend: по умолчанию — placeholder-сервис backend (nginx) в compose. Для реального API замените url на свой BACKEND_URL.
+# JWT: при 401 "No credentials found for given 'kid'" подставьте ключи из Authentik:
+#   cd iam/kong/scripts && python3 fetch-authentik-jwks-pem.py http://localhost:9000/application/o/farmadoc-app/jwks/ --update ../kong.yml
+#   (slug farmadoc-app или farmadoc_app — как у приложения в Authentik). Затем: docker compose restart kong
+
+_format_version: "3.0"
+
+consumers:
+  - username: authentik
+    jwt_secrets:
+      - key: foG913m81RSSDID7jjax1Mgwk2xybc4qyXnBwptR6XGHnscZGg-26sxrbZxRNEV4YQt25o-Wm0UBCrFaA8FMAw
+        algorithm: RS256
+        secret: "dummy"
+        rsa_public_key: |
+          -----BEGIN PUBLIC KEY-----
+          MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA1nnLFb9QZJgFLOiWwC7b
+          lk+XQLjwVGzFuQ1rc3u/HJVfyhuvnyqaQ18ElvL+cp+f3EeW/BEFY3yndSsopsvR
+          4tYwcSBmOChfd2IXJanQJU5JYA695iBXJJu+gqlCQUnskelWn8i7b7dHxpoeO5FJ
+          e5Trk1+79ixOLnfrl8q4jxUTOU3FEeKXSehjIy3WxUiwSDruRfHMIuz7qbC51qyO
+          +q/g8l2il7fkHGdqUz8TjlU2L0jgC9LccSu7gy+SIVE6N9yk2Ha6DSluBk04vdTe
+          lM7jO7Rro4dNAmantBMv7oVOP7BVCGw+7Q2oYsiLduD9rk1wMcz5oOaPLGw67wXA
+          avmUb5qi7RtyBCEjXSsB9hibfFz0pqKpdyAB6i1Qwr6oUG9XG9LKpiqBdPGX/K1l
+          b0V07UBm9QmcZHzNlPAbOyXYRPli5FEtQigAG7ar10h0lY/T0laOLK4EkgaMM6Ur
+          pUPUFlLsfQdOsgHOBPqqokg9mfFp9MYS9L54LZBj6Lo9HU6iSbVckSCwpFzkTBUI
+          5rdiR8o4lOMinOKKXdh3JvDGUcbAn0QRMz+WIaNlt6PGwwyB0SEFantlcWsB2WlW
+          8LGwC1PyFotixrQsBM/s/YX+YX/0Cpq9CfOVJLa2EYeTeoJKw2i8S75E8YFE/pdE
+          UfsgWe120CyiYdWqggyx+HECAwEAAQ==
+          -----END PUBLIC KEY-----
+
+services:
+  - name: backend
+    url: http://backend:80
+    routes:
+      - name: api
+        paths:
+          - /api
+        strip_path: false
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: kid
+          uri_param_names: []
+          claims_to_verify:
+            - exp
