@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Полное удаление Kong: остановка и удаление контейнера kong.
-# Запуск из корня репозитория: ./kong/scripts/uninstall-kong.sh
+# Запуск из корня репозитория: ./iam/kong/scripts/uninstall-kong.sh
 # Опция: -f | --force — без подтверждения.
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 cd "$REPO_ROOT"
 
 # Проверка доступа к Docker (без прав будет permission denied на одном из шагов)
@@ -28,7 +28,7 @@ if [[ -z "$FORCE" ]]; then
   echo "Будет выполнено:"
   echo "  1. Остановка и удаление контейнера kong"
   echo ""
-  echo "Конфиг kong/kong.yml на хосте не удаляется. Зависимости (authentik-server, backend) не трогаются."
+  echo "Конфиг iam/kong/kong.yml на хосте не удаляется. Зависимости (authentik-server, backend) не трогаются."
   echo ""
   read -r -p "Продолжить? [y/N] " ans
   if [[ ! "$ans" =~ ^[yY] ]]; then
@@ -41,4 +41,4 @@ echo "[1/1] Остановка и удаление контейнера kong..."
 docker compose stop kong 2>/dev/null || true
 docker rm -f kong 2>/dev/null || true
 
-echo "Готово. Kong удалён. Для повторной установки: docker compose up -d kong (см. kong/kong.yml и документацию)."
+echo "Готово. Kong удалён. Для повторной установки: docker compose up -d kong (см. iam/kong/kong.yml и документацию)."

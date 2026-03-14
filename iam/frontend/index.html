@@ -64,14 +64,74 @@
         return base64UrlEncode(arr.buffer);
       }
 
+      function sha256Hex(ascii) {
+        function rightRotate(value, amount) { return ((value >>> amount) | (value << (32 - amount))) >>> 0; }
+        var maxWord = 0x100000000, result = '';
+        var words = [], asciiBitLength = ascii.length * 8;
+        var hash = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+        var k = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+        ascii += '\x80';
+        while (ascii.length % 64 !== 56) ascii += '\x00';
+        for (var i = 0; i < ascii.length; i++) {
+          var j = ascii.charCodeAt(i);
+          if (j > 255) return '';
+          if (!words[i >> 2]) words[i >> 2] = 0;
+          words[i >> 2] |= j << ((3 - (i % 4)) * 8);
+        }
+        words[words.length] = (asciiBitLength / maxWord) | 0;
+        words[words.length] = asciiBitLength;
+        for (var chunk = 0; chunk < words.length;) {
+          var w = words.slice(chunk, chunk += 16);
+          for (var i = 16; i < 64; i++) {
+            var w15 = w[i - 15], w2 = w[i - 2];
+            w[i] = (w[i - 16] + (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3)) + w[i - 7] + (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))) >>> 0;
+          }
+          var oldHash = hash.slice(0, 8);
+          hash = hash.slice(0, 8);
+          for (var i = 0; i < 64; i++) {
+            var a = hash[0], e = hash[4];
+            var temp1 = (hash[7] + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) + ((e & hash[5]) ^ ((~e) & hash[6])) + k[i] + w[i]) >>> 0;
+            var temp2 = ((rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]))) >>> 0;
+            hash = [(temp1 + temp2) >>> 0].concat(hash);
+            hash[4] = (hash[4] + temp1) >>> 0;
+          }
+          for (var i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i]) >>> 0;
+        }
+        for (var i = 0; i < 8; i++)
+          for (var j = 3; j >= 0; j--) {
+            var b = (hash[i] >> (j * 8)) & 255;
+            result += (b < 16 ? '0' : '') + b.toString(16);
+          }
+        return result;
+      }
+
       function sha256Bytes(data) {
-        return crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
+        var bytes = new TextEncoder().encode(data);
+        if (typeof crypto !== 'undefined' && crypto.subtle && typeof crypto.subtle.digest === 'function') {
+          return crypto.subtle.digest('SHA-256', bytes).then(function (buf) { return Array.from(new Uint8Array(buf)); });
+        }
+        var str = String.fromCharCode.apply(null, bytes);
+        var hex = sha256Hex(str);
+        var arr = [];
+        for (var i = 0; i < hex.length; i += 2) arr.push(parseInt(hex.substr(i, 2), 16));
+        return Promise.resolve(arr);
       }
 
       async function pkceChallenge(verifier) {
-        const hash = await sha256Bytes(verifier);
-        return base64UrlEncode(hash);
+        var hash = await sha256Bytes(verifier);
+        var buf = new Uint8Array(hash).buffer;
+        return base64UrlEncode(buf);
       }
+
+      var pkceTestOk = false;
+      (function () {
+        var rfcVerifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+        var rfcChallenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+        pkceChallenge(rfcVerifier).then(function (got) {
+          pkceTestOk = (got === rfcChallenge);
+          if (!pkceTestOk) console.warn('PKCE S256 test failed: expected', rfcChallenge, 'got', got);
+        }).catch(function () { pkceTestOk = false; });
+      })();
 
       function loadConfig() {
         return fetch('/config.json')
@@ -120,11 +180,15 @@
             return true;
           }
           apiResult.textContent = 'Обмен code на токен (PKCE)…';
+          var redirectUriForExchange = null;
+          try { redirectUriForExchange = sessionStorage.getItem('oidc_redirect_uri'); } catch (_) {}
+          if (!redirectUriForExchange) redirectUriForExchange = config.redirectUri || (window.location.origin + CALLBACK_PATH);
+          try { sessionStorage.removeItem('oidc_redirect_uri'); } catch (_) {}
           try {
             const res = await fetch('/auth/exchange', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code, code_verifier: codeVerifier, redirect_uri: config.redirectUri })
+              body: JSON.stringify({ code, code_verifier: codeVerifier, redirect_uri: redirectUriForExchange })
             });
             const data = await res.json();
             if (data.access_token) {
@@ -154,36 +218,57 @@
           setStatus('Не заданы oidcDiscoveryUrl или clientId в конфиге.', true);
           return;
         }
-        setStatus('Загрузка discovery…');
+        const discoveryTimeoutSec = 10;
+        setStatus('Загрузка discovery… (макс. ' + discoveryTimeoutSec + ' с)');
         let discovery;
+        const controller = new AbortController();
+        const timeoutPromise = new Promise(function (_, reject) {
+          setTimeout(function () {
+            controller.abort();
+            reject(new Error('TIMEOUT'));
+          }, discoveryTimeoutSec * 1000);
+        });
+        const fetchPromise = fetch(config.oidcDiscoveryUrl, { signal: controller.signal })
+          .then(function (r) { return r.json(); });
         try {
-          const r = await fetch(config.oidcDiscoveryUrl);
-          discovery = await r.json();
-          if (!discovery.authorization_endpoint) throw new Error('Нет authorization_endpoint');
+          discovery = await Promise.race([fetchPromise, timeoutPromise]);
         } catch (e) {
-          setStatus('Ошибка discovery: ' + e.message, true);
+          var msg = (e.name === 'AbortError' || e.message === 'TIMEOUT')
+            ? 'Таймаут загрузки discovery (' + discoveryTimeoutSec + ' с). Проверьте: 1) BFF и Authentik запущены (docker compose ps), 2) при доступе по IP хост доступен с вашей машины.'
+            : e.message;
+          setStatus('Ошибка discovery: ' + msg, true);
           return;
         }
-        const codeVerifier = randomString(32);
-        const codeChallenge = await pkceChallenge(codeVerifier);
-        const state = randomString(16);
+        if (discovery.error) {
+          setStatus('Ошибка discovery: ' + (discovery.detail || discovery.error), true);
+          return;
+        }
+        if (!discovery.authorization_endpoint) {
+          setStatus('Ошибка discovery: Нет authorization_endpoint', true);
+          return;
+        }
+        setStatus('Перенаправление на Authentik…');
         try {
+          var codeVerifier = randomString(32);
+          var codeChallenge = await pkceChallenge(codeVerifier);
+          var state = randomString(16);
+          var redirectUriUsed = config.redirectUri || (window.location.origin + CALLBACK_PATH);
           sessionStorage.setItem('oidc_state', state);
           sessionStorage.setItem('oidc_code_verifier', codeVerifier);
-        } catch (_) {
-          setStatus('Ошибка sessionStorage.', true);
-          return;
+          sessionStorage.setItem('oidc_redirect_uri', redirectUriUsed);
+          var authUrl = discovery.authorization_endpoint
+            + (discovery.authorization_endpoint.indexOf('?') >= 0 ? '&' : '?')
+            + 'response_type=code'
+            + '&client_id=' + encodeURIComponent(config.clientId)
+            + '&redirect_uri=' + encodeURIComponent(redirectUriUsed)
+            + '&scope=openid'
+            + '&code_challenge=' + encodeURIComponent(codeChallenge)
+            + '&code_challenge_method=S256'
+            + '&state=' + encodeURIComponent(state);
+          window.location.href = authUrl;
+        } catch (err) {
+          setStatus('Ошибка перед редиректом: ' + (err && err.message ? err.message : String(err)), true);
         }
-        const authUrl = discovery.authorization_endpoint
-          + (discovery.authorization_endpoint.includes('?') ? '&' : '?')
-          + 'response_type=code'
-          + '&client_id=' + encodeURIComponent(config.clientId)
-          + '&redirect_uri=' + encodeURIComponent(config.redirectUri)
-          + '&scope=openid'
-          + '&code_challenge=' + encodeURIComponent(codeChallenge)
-          + '&code_challenge_method=S256'
-          + '&state=' + encodeURIComponent(state);
-        window.location.href = authUrl;
       });
 
       btnApi.addEventListener('click', function () {

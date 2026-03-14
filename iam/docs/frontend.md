@@ -13,7 +13,7 @@
 Из корня репозитория:
 
 ```bash
-cd client
+cd iam/frontend
 python3 serve.py
 ```
 
@@ -32,7 +32,7 @@ python3 serve.py
 | `KONG_API_BASE_URL` | пусто | Базовый URL API (Kong). Пусто — SPA ходит на тот же origin по `/api`, BFF проксирует в Kong. |
 | `KONG_INTERNAL_URL` | `http://localhost:8001` | URL Kong, на который BFF проксирует запросы `/api`. |
 | `AUTHENTIK_BASE_URL` | `http://localhost:9000` | Используется для сборки discovery URL, если `OIDC_DISCOVERY_URL` не задан. |
-| `OIDC_APP_SLUG` | `farmadoc_client` | Slug приложения в Authentik для сборки discovery URL. |
+| `OIDC_APP_SLUG` | `farmadoc-app` | Slug приложения в Authentik для сборки discovery URL. |
 | `PORT` | `3000` | Порт BFF. |
 
 Для прода задайте `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_REDIRECT_URI` (например `https://app.example.com/callback`). В Authentik в провайдере добавьте этот redirect URI (в blueprint или в UI).
@@ -40,8 +40,8 @@ python3 serve.py
 ## Развёртывание в проде
 
 1. **Конфиг:** задайте переменные окружения (или секрет-менеджер) на сервере, где крутится BFF. Не коммитьте секреты в репозиторий.
-2. **Статика и BFF:** раздавайте файлы из `client/` (например nginx для статики) и запускайте `serve.py` за reverse proxy, либо один сервер (как сейчас) раздаёт и статику, и `/config.json`, `/auth/exchange`, `/api`.
-3. **Redirect URI:** в Authentik у провайдера должен быть redirect URI вашего приложения (например `https://your-domain.com/callback`). Можно добавить в `authentik/blueprints/farmadoc-oidc.yaml` и применить blueprint заново или добавить в UI.
+2. **Статика и BFF:** раздавайте файлы из `frontend/` (например nginx для статики) и запускайте `serve.py` за reverse proxy, либо один сервер (как сейчас) раздаёт и статику, и `/config.json`, `/auth/exchange`, `/api`.
+3. **Redirect URI:** в Authentik у провайдера должен быть redirect URI вашего приложения (например `https://your-domain.com/callback`). Можно добавить в `iam/authentik/blueprints/farmadoc-oidc.yaml` и применить blueprint заново или добавить в UI.
 4. **Kong:** issuer в Kong должен указывать на discovery вашего провайдера Authentik; запросы к API с вашего домена проксируйте на Kong или задайте `KONG_API_BASE_URL` и настройте CORS на Kong для origin SPA.
 
 ## Отличия от тестового SPA (authentik/spa-test)
@@ -50,4 +50,4 @@ python3 serve.py
 - Конфиг через `/config.json` и переменные окружения, без захардкоженных URL в коде.
 - Один билд пригоден для разных окружений (dev/prod) за счёт конфига и redirect_uri в Authentik.
 
-Подробнее о потоке авторизации: [docs/auth-flow.md](../docs/auth-flow.md). Настройка Authentik и Kong: [authentik/doc/authentik.md](../authentik/doc/authentik.md), [kong/doc/kong.md](../kong/doc/kong.md). Сравнение статического SPA и SPA + BFF (безопасность): [spa-vs-bff.md](spa-vs-bff.md).
+Подробнее: [auth-flow.md](auth-flow.md), [authentik.md](authentik.md), [kong.md](kong.md). Сравнение SPA и SPA + BFF (безопасность): [spa-vs-bff.md](spa-vs-bff.md).

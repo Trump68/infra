@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Автоматическая настройка Kong JWT: получение ключа из JWKS Authentik, подстановка в kong/kong.yml, перезапуск Kong.
-# Запуск из корня репозитория. Требует: Authentik запущен, провайдер создан (см. authentik/doc/manual-provider-app-settings.md).
+# Автоматическая настройка Kong JWT: получение ключа из JWKS Authentik, подстановка в iam/kong/kong.yml, перезапуск Kong.
+# Запуск из корня репозитория. Требует: Authentik запущен, провайдер создан (см. iam/docs/authentik.md).
 # Использование:
-#   ./kong/scripts/setup-kong-jwt-auth.sh
-#   ./kong/scripts/setup-kong-jwt-auth.sh "http://localhost:9000/application/o/<slug>/jwks/"
-#   ./kong/scripts/setup-kong-jwt-auth.sh --no-restart   # не перезапускать Kong после обновления конфига
+#   ./iam/kong/scripts/setup-kong-jwt-auth.sh
+#   ./iam/kong/scripts/setup-kong-jwt-auth.sh "http://localhost:9000/application/o/<slug>/jwks/"
+#   ./iam/kong/scripts/setup-kong-jwt-auth.sh --no-restart   # не перезапускать Kong после обновления конфига
 # Опционально: AUTHENTIK_ACCESS_TOKEN=eyJ... — в конце проверить запрос с Bearer-токеном (ожидается ответ backend).
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-KONG_YML="${REPO_ROOT}/kong/kong.yml"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+KONG_YML="${REPO_ROOT}/iam/kong/kong.yml"
 FETCH_SCRIPT="${SCRIPT_DIR}/fetch-authentik-jwks-pem.py"
 JWKS_URL=""
 NO_RESTART=0
@@ -63,12 +63,12 @@ if [[ -z "$JWKS_URL" ]]; then
   fi
 fi
 
-echo "Запрос JWKS у Authentik и обновление kong/kong.yml..."
+echo "Запрос JWKS у Authentik и обновление iam/kong/kong.yml..."
 if UPDATED=$(python3 "$FETCH_SCRIPT" "$JWKS_URL" --update "$KONG_YML" 2>&1); then
   echo "Обновлён файл: $UPDATED"
 else
   echo "$UPDATED" >&2
-  echo "Подсказка: проверьте, что провайдер OIDC создан в Authentik и slug в URL совпадает (см. authentik/doc/manual-provider-app-settings.md)." >&2
+  echo "Подсказка: проверьте, что провайдер OIDC создан в Authentik и slug в URL совпадает (см. iam/docs/authentik.md)." >&2
   exit 2
 fi
 
