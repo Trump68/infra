@@ -8,13 +8,18 @@
 
 ```bash
 cp .env.example .env
-# Отредактируйте .env: задайте AUTHENTIK_SECRET_KEY и при необходимости POSTGRES_USER/POSTGRES_PASSWORD (postgres и Authentik используют один инстанс)
+# Отредактируйте .env: задайте PG_PASS, AUTHENTIK_SECRET_KEY и при необходимости POSTGRES_USER/POSTGRES_PASSWORD
+# Перед первым запуском сервисов Authentik создайте .env.vault и при необходимости поднимите Authentik:
+./iam/authentik/scripts/run-authentik-with-vault.sh --from-env   # секреты из .env, создаёт .env.vault и запускает Authentik
+# Либо из Vault: записать секреты в Vault (см. iam/docs/vault.md), затем: ./iam/authentik/scripts/run-authentik-with-vault.sh
 docker compose up -d
 ```
 
-**Откуда взять значения:** `AUTHENTIK_SECRET_KEY` — сгенерируйте случайную строку, например: `openssl rand -base64 48`. `POSTGRES_USER` и `POSTGRES_PASSWORD` — придумайте сами (логин/пароль БД PostgreSQL); для локальной разработки можно оставить по умолчанию `postgres` / `postgres`, если в `.env.example` они закомментированы — раскомментируйте и подставьте или добавьте в `.env`.
+**Откуда взять значения:** `AUTHENTIK_SECRET_KEY` — сгенерируйте случайную строку, например: `openssl rand -base64 48`. `PG_PASS` — пароль PostgreSQL для Authentik (до 99 символов), например: `openssl rand -base64 36 | tr -d '\n'`. `POSTGRES_USER` и `POSTGRES_PASSWORD` — придумайте сами (логин/пароль БД PostgreSQL); для локальной разработки можно оставить по умолчанию `postgres` / `postgres`, если в `.env.example` они закомментированы — раскомментируйте и подставьте или добавьте в `.env`.
 
-Полный стек: etcd, minio, milvus, vllm_emb, postgres, redis, authentik-server, authentik-worker, backend (placeholder), kong. Только Milvus: `docker compose up -d etcd minio milvus`. Только авторизация: `docker compose up -d postgres redis authentik-server authentik-worker backend kong`.
+Полный сценарий (секреты из Vault или из .env): [iam/docs/vault.md](iam/docs/vault.md#как-запускать-authentik-с-секретами-из-vault).
+
+Полный стек: etcd, minio, milvus, vllm_emb, postgres, redis, authentik-server, authentik-worker, backend (placeholder), kong, vault. Только Milvus: `docker compose up -d etcd minio milvus`. Только авторизация: `docker compose up -d postgres redis authentik-server authentik-worker backend kong` (предварительно создайте `.env.vault` — см. выше).
 
 ## Milvus
 
@@ -54,7 +59,7 @@ docker compose up -d
 
 - [docs/milvus-n8n.md](docs/milvus-n8n.md) — Milvus и n8n
 - [docs/vllm.md](docs/vllm.md) — vLLM, модели, GPU
-- **iam/docs/** — IAM (Identity and Access Management): [kong.md](iam/docs/kong.md), [authentik.md](iam/docs/authentik.md), [auth-flow.md](iam/docs/auth-flow.md), [frontend.md](iam/docs/frontend.md), [spa-vs-bff.md](iam/docs/spa-vs-bff.md)
+- **iam/docs/** — IAM (Identity and Access Management): [kong.md](iam/docs/kong.md), [authentik.md](iam/docs/authentik.md), [auth-flow.md](iam/docs/auth-flow.md), [frontend.md](iam/docs/frontend.md), [spa-vs-bff.md](iam/docs/spa-vs-bff.md), [vault.md](iam/docs/vault.md) (секреты, Authentik из Vault)
 - [iam/frontend/README.md](iam/frontend/README.md) — продакшен-SPA (OIDC + PKCE), запуск из iam/frontend
 - [docs/docker-without-sudo.md](docs/docker-without-sudo.md) — запуск Docker без sudo
 - [docs/nvidia-driver-ubuntu.md](docs/nvidia-driver-ubuntu.md) — установка драйвера NVIDIA на Ubuntu

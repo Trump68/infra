@@ -130,10 +130,14 @@ services:
       - farmadoc-network
 
   # Authentik (OIDC/OAuth2 IdP) — по https://version-2026-2.goauthentik.io/install-config/install/docker-compose/
+  # Секреты PG_PASS и AUTHENTIK_SECRET_KEY: из .env или из .env.vault (создаётся скриптом iam/authentik/scripts/run-authentik-with-vault.sh).
   authentik-postgresql:
     image: postgres:16-alpine
     container_name: authentik-postgresql
     restart: unless-stopped
+    env_file:
+      - .env
+      - .env.vault
     environment:
       POSTGRES_PASSWORD: ${PG_PASS:?PG_PASS required for Authentik}
       POSTGRES_USER: ${PG_USER:-authentik}
@@ -182,6 +186,7 @@ services:
       - authentik_templates:/templates
     env_file:
       - .env
+      - .env.vault
     ports:
       - "${COMPOSE_PORT_HTTP:-9000}:9000"
       - "${COMPOSE_PORT_HTTPS:-9443}:9443"
@@ -212,6 +217,7 @@ services:
       # - /var/run/docker.sock:/var/run/docker.sock
     env_file:
       - .env
+      - .env.vault
     depends_on:
       authentik-postgresql:
         condition: service_healthy
@@ -249,6 +255,21 @@ services:
       - "8444:8443"   # proxy HTTPS
     depends_on:
       - backend
+    networks:
+      - farmadoc-network
+
+  # HashiCorp Vault — хранилище секретов и ключей шифрования (ТЗ, Описание ПО: ключи векторной БД, ротация 90 дней). Режим dev — только для разработки/тестов; в проде — production mode с unseal. См. iam/docs/vault.md
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN_ID:-dev-root-token}
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    ports:
+      - "8200:8200"
     networks:
       - farmadoc-network
 

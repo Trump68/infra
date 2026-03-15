@@ -6,6 +6,20 @@ Authentik — сервер авторизации (IdP) для единого в
 
 ---
 
+## Запуск с учётом секретов (Authentik)
+
+Сервисы Authentik читают секреты `PG_PASS` и `AUTHENTIK_SECRET_KEY` из файла **.env.vault** в корне репозитория (подключается через `env_file` в docker-compose). Рекомендуемый способ — единый скрипт **`run-authentik-with-vault.sh`**: он создаёт `.env.vault` и запускает контейнеры Authentik.
+
+- **Секреты в .env (без Vault):** из корня репо  
+  `./iam/authentik/scripts/run-authentik-with-vault.sh --from-env`
+
+- **Секреты в Vault:** запишите их в Vault (см. [vault.md](vault.md#как-запускать-authentik-с-секретами-из-vault)), затем из корня репо  
+  `./iam/authentik/scripts/run-authentik-with-vault.sh`
+
+Только подготовить `.env.vault` без запуска контейнеров: `--prepare-only` или `--prepare-only --from-env`. Полный сценарий и требования — в [vault.md](vault.md#как-запускать-authentik-с-секретами-из-vault).
+
+---
+
 ## Предварительные требования
 
 - **Docker** и **Docker Compose** (v2)
@@ -32,6 +46,8 @@ cp .env.example .env
 | `AUTHENTIK_SECRET_KEY` | Секретный ключ Authentik. Сгенерировать: `openssl rand -base64 60 \| tr -d '\n'` |
 
 Опционально: `PG_USER` (по умолчанию `authentik`), `PG_DB` (по умолчанию `authentik`), `COMPOSE_PORT_HTTP` / `COMPOSE_PORT_HTTPS` (9000 / 9443).
+
+Создание `.env.vault` и запуск — см. раздел [«Запуск с учётом секретов (Authentik)»](#запуск-с-учётом-секретов-authentik) выше.
 
 ### 2. Запуск сервисов
 
