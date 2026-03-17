@@ -1,18 +1,17 @@
 # Пример конфигурации Vault для production-like режима (файловое хранилище).
-# Использование: скопировать в config.hcl, при необходимости отредактировать,
+# Использование: скопировать в config.hcl, задать path для data, listener
 # и запускать контейнер с командой: vault server -config=/vault/config.hcl
 # и томом: -v $(pwd)/iam/vault/config.hcl:/vault/config.hcl:ro
 # После первого запуска потребуется vault operator init и unseal.
 
-ui = true
+storage "file" {
+  path = "/vault/data"
+}
 
 listener "tcp" {
   address     = "0.0.0.0:8200"
   tls_disable = 1
 }
 
-storage "file" {
-  path = "/vault/data"
-}
-
-api_addr = "http://0.0.0.0:8200"
+api_addr = "http://127.0.0.1:8200"
+ui       = true

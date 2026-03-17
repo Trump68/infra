@@ -258,7 +258,7 @@ services:
     networks:
       - farmadoc-network
 
-  # HashiCorp Vault — хранилище секретов и ключей шифрования (ТЗ, Описание ПО: ключи векторной БД, ротация 90 дней). Режим dev — только для разработки/тестов; в проде — production mode с unseal. См. iam/docs/vault.md
+  # HashiCorp Vault — хранилище секретов (Authentik: PG_PASS, AUTHENTIK_SECRET_KEY). Режим dev — только для разработки/тестов; в проде — production mode. См. iam/docs/vault.md
   vault:
     image: hashicorp/vault:1.15
     container_name: vault
